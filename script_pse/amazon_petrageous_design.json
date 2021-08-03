@@ -1,0 +1,169 @@
+{
+  "id": 0,
+  "name": "program",
+  "data_db_conn": "host=141.223.197.33 port=54320 user=pse password=pse dbname=pse",
+  "log_db_conn": "host=141.223.197.33 port=54320 user=pse password=pse dbname=pse",
+  "queue": "real_queue",
+  "ops": [{
+    "id": 1,
+    "name": "OpenURL",
+    "label": 1,
+    "url": "https://www.amazon.com/s?k=PetRageous+Designs&rh=p_72%3A2661618011%2Cp_n_condition-type%3A6461716011%2Cp_89%3APetrageous+Designs&dc&qid=1581642609&rnid=2528832011&ref=sr_nr_p_89_2",
+    "zipcode_url": "https://www.amazon.com/gp/delivery/ajax/address-change.html?locationType=LOCATION_INPUT&zipCode=94024&storeContext=offce-products&deviceType=web&pageType=detail&actionSource=glow",
+    "ops": [{
+      "id": 2,
+      "name": "Expander"
+    }]
+  },{
+    "id": 3,
+    "name": "BFSIterator",
+    "label": 2,
+    "input": 2,
+    "url_query": "&page=%d",
+    "delay": 5,
+    "initial_values": [1],
+    "increments": [1],
+    "max_num_tasks": -1,
+    "query": "//div[@class='s-expand-height s-include-content-margin s-border-bottom s-latency-cf-section']",
+    "ops": [{
+      "id": 4,
+      "name": "Expander",
+      "type": 1,
+      "query": "//span[@class='rush-component s-latency-cf-section']//div[@class='s-result-list s-search-results sg-row']//a[@class='a-link-normal a-text-normal']",
+      "attr": "href"
+    }]
+  },{
+    "id": 5,
+    "name": "BFSIterator",
+    "label": 3,
+    "max_num_tasks": -1,
+    "delay": 10,
+    "query": "//span[@id='productTitle']",
+    "input": 4,
+    "ops": [
+      {
+        "id": 6,
+        "name": "ValuesScrapper",
+        "queries": [{
+          "key": "name",
+          "query": "//span[@id='productTitle']",
+          "attr": "alltext",
+          "essential": true
+        },{
+          "key": "url",
+          "query": "",
+          "attr": "url"
+        },{
+          "key": "brand",
+          "query": "//a[@id='bylineInfo']",
+          "attr": "alltext"
+        },{
+          "key": "description",
+          "query": "//div[@id='featurebullets_feature_div']",
+          "attr": "outerHTML"
+        },{
+          "key": "rating",
+          "query": "//div[@id='averageCustomerReviews_feature_div']//span[@id='acrPopover']",
+          "attr": "title"
+        },{
+          "key": "information",
+          "query": "//div[@id='productDetails_feature_div']",
+          "attr": "outerHTML"
+        },{
+          "key": "asin",
+          "query": "//div[@id='averageCustomerReviews_feature_div']//div[@id='averageCustomerReviews']",
+          "attr": "data-asin"
+        },{
+          "key": "stock",
+          "query": "//select[@id='quantity']/option[last()]",
+          "attr": "value"
+        },{
+          "key": "zipcode",
+          "query": "//span[@id='glow-ingress-line2'][contains(text(),'94024')]",
+          "attr": "alltext",
+          "essential": true
+        }]
+      },{
+        "id": 7,
+        "name": "DictsScrapper",
+        "queries": [{
+          "key": "additional_info_dict",
+          "rows_query": "//div[@id='productDetails_db_sections']//table[@id='productDetails_detailBullets_sections1']/tbody/tr",
+          "key_query": "./th",
+          "key_attr": "alltext",
+          "value_query": "./td",
+          "value_attr": "alltext"
+        },{
+          "key": "technical_details_dict",
+          "rows_query": "//table[@id='productDetails_techSpec_section_1']/tbody/tr",
+          "key_query": "./th",
+          "key_attr": "alltext",
+          "value_query": "./td",
+          "value_attr": "alltext"
+        }]
+      },{
+        "id": 8,
+        "name": "ClickOperator",
+        "queries": [{
+          "delay": 5,
+          "query": "//li[@class='a-spacing-small item imageThumbnail a-declarative']"
+        }]
+      },{
+        "id": 9,
+        "name": "ListsScrapper",
+        "queries": [{
+          "key": "images",
+          "query": "//li[contains(@class, 'image item itemNo')]//img",
+          "attr": "src"
+        }]
+      },{
+        "id": 10,
+        "name": "ClickOperator",
+        "queries": [{
+          "delay": 5, 
+          "query": "//td[@class='a-span12 a-color-base a-size-base']//a[@class='a-link-normal a-text-bold'][contains(text(),'See price in cart')]"
+        }]
+      },{
+        "id": 11,
+        "name": "ValuesScrapper",
+        "queries": [{
+          "key": "dummy",
+          "query": "//span[contains(@id,'priceblock_')] | //div[contains(@id,'olp-upd-new')]//span[@class='a-color-price']",
+          "attr": "alltext",
+          "essential": true
+         }]
+      },{ 
+        "id": 12,
+        "name": "ValuesScrapper",
+        "queries": [{
+          "key": "price",
+          "query": "//span[contains(@id,'priceblock_')]",
+          "attr": "alltext"
+        }]
+      },{
+        "id": 13,
+        "name": "ValuesScrapper",
+        "queries": [{
+           "key": "shipping_price",
+           "query": "//span[@id='ourprice_shippingmessage']//span[@class='a-size-base a-color-secondary'] | //div[@id='desktop_unifiedPrice']//span[@id='price-shipping-message']//span[@class='a-color-secondary a-size-base']",
+           "attr": "alltext"
+        }]
+      },{
+       "id": 14,
+       "name": "ValuesScrapper",
+       "queries": [{
+         "key": "new_seller_price",
+         "query": "//div[contains(@id,'olp-upd-new')]//span[@class='a-color-price']",
+         "attr": "alltext"
+        }]
+      },{
+       "id": 15,
+       "name": "ValuesScrapper",
+       "queries": [{
+         "key": "new_seller_shipping_price",
+         "query": "//div[contains(@id,'olp-upd-new')]//span[@class='a-color-base']",
+         "attr": "alltext"
+        }]
+      }]
+  }]
+}

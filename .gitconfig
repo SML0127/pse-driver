@@ -1,0 +1,7 @@
+[user]
+	email = smlee@dblab.postech.ac.kr
+	name = smlee
+[http]
+	proxy = https://lsm8719@bitbucket.org/postech_dblab/pse-driver.git
+[https]
+	proxy = https://lsm8719@bitbucket.org/postech_dblab/pse-driver.git

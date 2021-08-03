@@ -1,0 +1,103 @@
+{
+  "id": 0,
+  "name": "program",
+  "data_db_conn": "host=141.223.197.33 port=54320 user=pse password=pse dbname=pse",
+  "log_db_conn": "host=141.223.197.33 port=54320 user=pse password=pse dbname=pse",
+  "queue": "real_queue",
+  "ops": [{
+    "id": 1,
+    "name": "OpenURL",
+    "label": 1,
+    "url": "https://www.jomashop.com/watches-for-women.html?dir=desc&order=bestsellers&price=50-1270%2C",
+    "ops": [{
+      "id": 2,
+      "name": "Expander"
+    }]
+  },{
+    "id": 3,
+    "name": "BFSIterator",
+    "label": 2,
+    "input": 2,
+    "url_query": "&p=%d",
+    "delay": 5,
+    "initial_values": [1],
+    "increments": [1],
+    "max_num_tasks": 96,
+    "query": "//a[@class='product-image']",
+    "ops": [{
+      "id": 4,
+      "name": "Expander",
+      "type": 1,
+      "query": "//a[@class='product-image']",
+      "attr": "href"
+    }]
+  },{
+    "id": 7,
+    "name": "BFSIterator",
+    "label": 3,
+    "max_num_tasks": -1,
+    "delay": 5,
+    "query": "//div[contains(@class,'product-main-info')]//span[@class='product-name']",
+    "input": 6,
+    "ops": [{
+       "id": 8,
+       "name": "ValuesScrapper",
+       "queries": [{
+         "key": "name",
+         "query": "//div[contains(@class,'product-main-info')]//span[@class='product-name']",
+         "attr": "alltext",
+         "essential": true
+       },{
+         "key": "url",
+         "query": "",
+         "attr": "url"
+       },{
+         "key": "brand",
+         "query": "//span[@class='brandWrapper']//a",
+         "attr": "alltext"
+       },{
+         "key": "description",
+         "query": "//div[@class='std']",
+         "attr": "outerHTML"
+       },{
+         "key": "rating",
+         "query": "//span[contains(@class,'yotpo-filter-stars rating-stars-container')]//span[@class='sr-only']",
+         "attr": "alltext"
+       },{
+         "key": "information",
+         "query": "//div[@class='product-attributes']",
+         "attr": "innerHTML"
+       },{
+         "key": "item_no",
+         "query": "//span[@id='attribute-id-model']",
+         "attr": "alltext"
+       },{
+         "key": "price",
+         "query": "//span[@id='final-price']",
+         "attr": "alltext"
+       },{
+         "key": "stock",
+         "query": "//span[@class='instock']",
+         "attr": "alltext",
+         "essential": true
+       },{
+         "key": "shipping_price",
+         "query": "//span[@class='instock-ready']",
+         "attr": "alltext"
+       },{
+         "key": "guarantee",
+         "query": "//div[@class='collateral-gaurantee-tab']",
+         "attr": "innerHTML"
+       }]
+    },{
+       "id": 9,
+       "name": "ListsScrapper",
+       "queries": [{
+         "key": "images",
+         "query": "//div[@class='MagicToolboxSelectorsContainer']//a",
+         "attr": "href"
+       }]
+     }]
+  }]
+}
+

@@ -1,0 +1,137 @@
+{
+  "id": 0,
+  "name": "program",
+  "data_db_conn": "host=141.223.197.33 port=54320 user=pse password=pse dbname=pse",
+  "log_db_conn": "host=141.223.197.33 port=54320 user=pse password=pse dbname=pse",
+  "queue": "real_queue",
+  "ops": [{
+    "id": 1,
+    "name": "OpenURL",
+    "label": 1,
+    "url": "https://s.taobao.com/search?spm=a21wu.241046-global.6977698868.418.2820b6cbfoqeNt&q=%E6%99%BA%E8%83%BD%E9%A3%9E%E8%A1%8C&acm=lb-zebra-241046-2072619.1003.4.1809950&scm=1003.4.lb-zebra-241046-2072619.OTHER_15161621838403_1809950&filter=reserve_price%5B5450%2C%5D&cps=yes&ppath=20000%3A385438465&style=grid&fs=1&user_type=1&bcoffset=0&p4ppushleft=%2C44",
+    "ops": [{
+      "id": 30,
+      "name": "LoginOperator",
+      "user_id": "lsm8719",
+      "pwd": "Tmdaksdl29!",
+      "user_id_query": "//input[@name='fm-login-id' and @type='text']",
+      "pwd_query": "//input[@name='fm-login-password' and @type='password']",
+      "click_query": "//button[@type='submit']"
+    },{
+      "id": 2,
+      "name": "Expander"
+    }]
+  },{
+    "id": 3,
+    "name": "BFSIterator",
+    "label": 2,
+    "input": 2,
+    "url_query": "&s=%d",
+    "delay": 10,
+    "initial_values": [0],
+    "increments": [44],
+    "max_num_tasks": 2,
+    "query": "//div[contains(@class,'items')]//div//div[1]//div[1]//div[1]//a[1]",
+    "ops": [{
+      "id": 4,
+      "name": "Expander",
+      "type": 1,
+      "query": "//div[contains(@class,'items')]//div//div[1]//div[1]//div[1]//a[1]",
+      "attr": "href"
+    }]
+  },{
+    "id": 5,
+    "name": "BFSIterator",
+    "label": 3,
+    "max_num_tasks": -1,
+    "delay": 10,
+    "query": "//dl[@class='tm-relate-wrapper tm-clear']//li//a[1]",
+    "input": 4,
+    "ops": [{
+      "id": 6,
+      "name": "Expander",
+      "type": 1,
+      "query": "//dl[@class='tm-relate-wrapper tm-clear']//li//a[1]",
+      "attr": "href",
+      "self": 1
+    }]
+  },{
+    "id": 7,
+    "name": "BFSIterator",
+    "label": 4,
+    "max_num_tasks": -1,
+    "delay": 10,
+    "query": "//div[contains(@class,'tb-key')]//li[not(contains(@class,'tb-out-of-stock')) and @data-value]//a",
+    "input": 6,
+    "ops": [{
+      "id": 8,
+      "name": "Expander",
+      "type": 1,
+      "query": "//div[contains(@class,'tb-key')]//li[not(contains(@class,'tb-out-of-stock')) and @data-value]//a",
+      "attr": "href",
+      "self": 1
+    }]
+  },{
+    "id": 9,
+    "name": "BFSIterator",
+    "label": 5,
+    "max_num_tasks": -1,
+    "delay": 10,
+    "query": "//div[@class='tb-detail-hd']//h1",
+    "input": 6,
+    "ops": [{
+       "id": 10,
+       "name": "ValuesScrapper",
+       "queries": [{
+         "key": "name",
+         "query": "//div[@class='tb-detail-hd']//h1",
+         "attr": "alltext",
+         "essential": true
+       },{
+         "key": "sub_name",
+         "query": "//div[contains(@class,'tb-key')]//li[contains(@class,'selected')]",
+         "attr": "title"
+       },{
+         "key": "url",
+         "query": "",
+         "attr": "url"
+       },{
+         "key": "description",
+         "query": "//body[@class='template-product has-iswatches']/div/main[@class='wrapper-full']/div[@class='wrapper-full product']/div[@class='wrapper']/div[@class='grid']/div[@class='grid__item large--one-half']/p[1]",
+         "attr": "alltext"
+       },{
+         "key": "price",
+         "query": "//p[@class='price']//span[1]",
+         "attr": "alltext",
+         "essential": true
+       },{
+         "key": "stock",
+         "query": "//div[@class='ui-msg-con ui-msg-stop']",
+         "attr": "alltext"
+       }]
+    },{
+      "id": 11,
+      "name": "ListsScrapper",
+      "queries": [{
+        "key": "images",
+        "query": "//ul[@class='tb-thumb tm-clear']//a//img",
+        "attr": "src"
+      },{
+        "key": "description",
+        "query": "//div[@class='attributes-list']//ul//li",
+        "attr": "alltext"
+      }]
+    },{
+       "id": 12,
+       "name": "DictsScrapper",
+       "queries": [{
+         "key": "additional_info_dict",
+         "rows_query": "//div[@class='attributes-list']//ul//li",
+         "key_query": "./b",
+         "key_attr": "alltext",
+         "value_query": "./.",
+         "value_attr": "alltext"
+        }]
+     }]
+  }]
+}

@@ -1,0 +1,7 @@
+./htmls/*
+!.gitignore
+cli*
+*.csv
+*.swp
+*.sql
+tmp*
