@@ -59,12 +59,10 @@ class CategoryManager(Resource):
 
     def save_category(self, category):
         try:
-            print(category)
             cur = conn.cursor()
             sql = "update category set category = '"
             sql += category
             sql += "' where id = 1"
-            print(sql)
             cur.execute(sql)
             conn.commit()
 
@@ -103,7 +101,6 @@ class TransformManager(Resource):
             sql += "where id = "
             sql += transform_id + ";"
             cur.execute(sql)
-            print(sql)
             result = cur.fetchall()
             conn.commit()
             return { "success": True, "output" : result }
@@ -147,7 +144,6 @@ class TransformManager(Resource):
             sql += columns_and_tree
             sql += "' where id = "
             sql += transform_id + ";"
-            print(sql)
             cur.execute(sql)
             conn.commit()
             return { "success": True }
@@ -190,12 +186,10 @@ class ObjectManager(Resource):
 
     def save_object_tree(self, object_tree):
         try:
-            #print(category)
             cur = conn.cursor()
             sql = "update object_tree set object_tree = '"
             sql += object_tree
             sql += "' where id = 1"
-            #print(sql)
             cur.execute(sql)
             conn.commit()
 
@@ -248,7 +242,6 @@ class UserProgramManager(Resource):
          
             result = cur.fetchone()[0]
             is_template = not(result)
-            print(is_template)
             if result == True:
                query = "select id, program, site, job_id from user_program where job_id = {} order by update_time desc, id desc limit 1;".format(job_id)
                cur.execute(query)
@@ -351,65 +344,6 @@ class UserProgramManager(Resource):
             return self.get_last_user_program(args['job_id']);
         return { "success": False }
 
-#class UserProgramTempManager(Resource):
-#    def get_user_program(self, project_id):
-#        try:
-#            cur = conn.cursor()
-#            query = "select id, site, category, program from user_program_temp where project_id = "
-#            query += "'" + project_id + "';"
-#            cur.execute(query)
-#            result = cur.fetchall()
-#            conn.commit()
-#            return { "success": True, "output" : result }
-#        except:
-#            conn.rollback()
-#            return { "success": False }
-#
-#    def get_last_user_program(self):
-#        try:
-#            query = "select id, user_program from user_program order by id desc limit 1;"
-#            cur = conn.cursor()
-#            cur.execute(query)
-#            result = cur.execute(query)
-#            result = cur.fetchone()
-#            conn.commit()
-#            return { "success": True, "program_id": result[0], "program": result[1] }
-#        except:
-#            conn.rollback()
-#            return { "success": False, "traceback": str(traceback.format_exc()) }
-#
-#    def save_user_program(self, site, category, user_program, job_id):
-#        try:
-#            #print(site)
-#            values = [site, category, user_program, project_id]
-#            query = make_query_insert("user_program_temp", ["site","category","program","project_id"], values)
-#            cur = conn.cursor()
-#            cur.execute(query, values)
-#            conn.commit()
-#            return { "success": True }
-#        except:
-#            conn.rollback()
-#            return { "success": False, "traceback": str(traceback.format_exc()) }       
-#
-#    def post(self):
-#        parser = reqparse.RequestParser()
-#        parser.add_argument('req_type')
-#        parser.add_argument('site')
-#        parser.add_argument('category')
-#        parser.add_argument('program')
-#        parser.add_argument('project_id')
-#        args = parser.parse_args()
-#        if args['req_type'] == 'save_user_program':
-#            return self.save_user_program(args['site'],args['category'],args['program'],args['project_id'])
-#        if args['req_type'] == 'get_user_program':
-#            return self.get_user_program(args['project_id'])
-#        if args['req_type'] == 'get_last_user_program':
-#            return self.get_last_user_program()
-#        return { "success": False }
-
-
-
-
 
 
 
@@ -494,7 +428,6 @@ class TaskManager(Resource):
     def get_succeed_task(self, task_id, tables):
         try:
 
-            #print ("shit..")
             cur = conn.cursor()
            
             query = "select task.input, stage.level from task join stage on stage.id = task.stage_id where task.id = %s;"
@@ -667,7 +600,6 @@ class FailedJobsManager(Resource):
             return { "success": True, "num_failed_jobs_per_level" : result }
         except:
             conn.rollback()
-            #print("fail")
             return { "success": False }
 
     def get_failed_jobs(self, execution_id):
@@ -681,7 +613,6 @@ class FailedJobsManager(Resource):
             return { "success": True, "failed_jobs" : result }
         except:
             conn.rollback()
-            #print("fail")
             return { "success": False }
 
     def get_failed_jobs(self, execution_id, level):
@@ -713,7 +644,6 @@ class FailedJobsManager(Resource):
             return { "success": False }
 
     def post(self):
-        #print("fucking")
         parser = reqparse.RequestParser()
         parser.add_argument('execution_id')
         parser.add_argument('job_id')
@@ -738,7 +668,6 @@ class TesterOnServer(Resource):
         #test = Tester()
         url = json.loads(url)[0]
         program = json.loads(program)
-        #print (url, level)
         (msg_list, err_msg) = ([],"")#test.test(url, program, int(level)-1)
         #test.close()
 
@@ -780,7 +709,6 @@ class DBSchemasManager(Resource):
         try:
             query = "select schema from db_schema where id = %s"
             values = (db_schema_id)
-            #print (query % db_schema_id)
             cur = conn.cursor()
             cur.execute(query, values)
             result = cur.fetchone()[0]
@@ -844,7 +772,6 @@ class ProgramsManager(Resource):
         try:
             query = "select program from program where id = %s"
             values = (program_id)
-            #print (query % program_id)
             cur = conn.cursor()
             cur.execute(query, values)
             result = cur.fetchone()[0]
@@ -928,33 +855,26 @@ class ExecutionsManager(Resource):
                     exec_id = str(val[0])
 
                     query =  'select count(*) from task where stage_id in (select max(id) from stage where execution_id = {}) and status = 1'.format(exec_id)
-                    #query =  'select count(n.id) from node n, stage s, task t, (select max(n1.label) as max_label from node n1, stage s1, task t1 where n1.task_id = t1.id and t1.stage_id = s1.id and s1.execution_id = '+exec_id+') as l where n.task_id = t.id and t.stage_id = s.id and s.execution_id = '+exec_id+' and n.label = l.max_label and t.status = 1;'
                     cur.execute(query)
                     res= cur.fetchone()
                     result[idx] = result[idx] + (res[0],)
 
                     query =  'select count(*) from task where stage_id in (select max(id) from stage where execution_id = {}) and status = -1'.format(exec_id)
-                    #query =  'select count(n.id) from node n, stage s, task t, (select max(n1.label) as max_label from node n1, stage s1, task t1 where n1.task_id = t1.id and t1.stage_id = s1.id and s1.execution_id = '+exec_id+') as l where n.task_id = t.id and t.stage_id = s.id and s.execution_id = '+exec_id+' and n.label = l.max_label and t.status = -1;'
                     cur.execute(query)
                     res= cur.fetchone()
                     result[idx] = result[idx] + (res[0],) 
 
                     query =  'select count(*) from task where stage_id in (select max(id) from stage where execution_id = {}) and status = -999'.format(exec_id)
-                    #query =  'select count(n.id) from node n, stage s, task t, (select max(n1.label) as max_label from node n1, stage s1, task t1 where n1.task_id = t1.id and t1.stage_id = s1.id and s1.execution_id = '+exec_id+') as l where n.task_id = t.id and t.stage_id = s.id and s.execution_id = '+exec_id+' and n.label = l.max_label and t.status = -999;'
                     cur.execute(query)
                     res= cur.fetchone()
                     result[idx] = result[idx] + (res[0],) 
 
                     query =  'select count(*) from task where stage_id in (select max(id) from stage where execution_id = {})'.format(exec_id)
-                    #query =  'select count(n.id) from node n, stage s, task t, (select max(n1.label) as max_label from node n1, stage s1, task t1 where n1.task_id = t1.id and t1.stage_id = s1.id and s1.execution_id = '+exec_id+') as l where n.task_id = t.id and t.stage_id = s.id and s.execution_id = '+exec_id+' and n.label = l.max_label;'
                     cur.execute(query)
                     res= cur.fetchone()
                     result[idx] = result[idx] + (res[0],) 
                   else: # after 2days
                     exec_id = str(val[0])
-                    #query = 'select max(id) from stage where execution_id = {}'.format(exec_id)
-                    #cur.execute(query)
-                    #stage_id= cur.fetchone()[0]
 
                     query = 'select count(*) from task where stage_id in (select max(id) from stage where execution_id = {}) and status = 1'.format(exec_id)
                     cur.execute(query)
@@ -994,7 +914,6 @@ class ExecutionsManager(Resource):
                     query = "update execution set num_invalid = {} where id = {}".format(res[0], val[0])
                     cur.execute(query)
                     conn.commit()
-          
 
 
                     query = 'select count(*) from task where stage_id in (select max(id) from stage where execution_id = {})'.format(exec_id)
@@ -1125,7 +1044,6 @@ class ExecutionsManager(Resource):
             conn.commit()
             return { "success": True, "execution" : result }
         except:
-            #print ("fail")
             conn.rollback()
             print(traceback.format_exc())
             return { "success": False, "traceback": str(traceback.format_exc()) }       
@@ -1144,7 +1062,6 @@ class ExecutionsManager(Resource):
 
     def get_succeed_execution(self, execution_id, tables):
         try:
-            #print ("shit..")
             cur = db_conn.cursor()
             tables = json.loads(tables)
             output_db=[]
@@ -1178,7 +1095,6 @@ class ExecutionsManager(Resource):
             cur = conn.cursor()
             cur.execute(query)
             result = cur.fetchall()
-            #print(result)
             job_ids = []
             for i in result:
               job_ids.append(i[0])
@@ -1189,7 +1105,6 @@ class ExecutionsManager(Resource):
             job_id_str = job_id_str[0:-2] + ')'
 
             query = "select label from jobs where id in (select job_id from check_is_error where is_error = 1 and job_id in " + job_id_str +")"
-            #print(query)
             cur = conn.cursor()
             cur.execute(query)
             result = cur.fetchall()
@@ -1208,7 +1123,6 @@ class ExecutionsManager(Resource):
 
     def get_data(self, exec_id):
         try:
-            print('get data')
             #query = "select node_id, key, value from node_property where node_id in (select id from node where task_id in (select id from task where stage_id in (select max(id) from stage where execution_id = {}))) and key != 'html' order by node_id asc, id asc;".format(exec_id)
             query = "select node_id, key, value from node_property where node_id in (select id from node where task_id in (select id from task where stage_id in (select max(id) from stage where execution_id = {}))) order by node_id asc, id asc;".format(exec_id)
             #query = "select node_id, key, value from node_property where node_id in (select id from node where task_id in (select id from task where stage_id in (select max(id) from stage where execution_id = {}))) and key != 'html' order by node_id asc limit 3;".format(exec_id)
@@ -1266,34 +1180,6 @@ class ExecutionsManager(Resource):
         elif args['req_type'] == 'get_data':
             return self.get_data(args['execution_id'])
         return {}
-
-class ExecutionsTempManager(Resource): # added by mwseo
-    def get_executions(self, job_id):
-        try:
-            cur = conn.cursor()
-            subquery =  "select exc.id as id, exc.program_id as program_id, exc.category as category, exc.start_time as start_time, exc.end_time as end_time, COALESCE(stage.level, 0) as current_stage "
-            subquery += "from execution_temp as exc left join stage on exc.id = stage.execution_id where exc.job_id = " + job_id
-            query =  "select t.id, t.program_id,t.category, TO_CHAR(t.start_time, 'YYYY:HH24:MI:SS'), TO_CHAR(t.end_time, 'YYYY:HH24:MI:SS'), MAX(current_stage) "
-            query += "from (" + subquery + ") as t "
-            query += "group by t.id, t.program_id, t.category,  t.start_time, t.end_time "
-            query += "order by t.id desc; "
-            cur.execute(query)
-            result = cur.fetchall()
-            conn.commit()
-            return { "success": True, "executions" : result }
-        except:
-            conn.rollback()
-            print(traceback.format_exc())
-            return { "success": False, "traceback": str(traceback.format_exc()) }  
-
-    def post(self):
-        parser = reqparse.RequestParser()
-        parser.add_argument('req_type')
-        parser.add_argument('job_id')
-        args = parser.parse_args()
-        if args['req_type'] == 'get_executions':
-            return self.get_executions(args['job_id'])
-
 
 
 class AccountManager(Resource):
@@ -1464,7 +1350,6 @@ class JobManager(Resource): # added by mwseo
             cur = conn.cursor()
             query = "select json_agg(json_build_object('id', id, 'parentId', parent_id, 'label', label) order by lower(label) asc) from jobs "
             query += "where user_id = '" + user_id + "';"
-            print(query)
             cur.execute(query)
             result = cur.fetchall()
             conn.commit()
@@ -1484,7 +1369,7 @@ class JobManager(Resource): # added by mwseo
             cur.execute(query)
             url = cur.fetchone()[0]
 
-            query = "select count(mpid) from job_source_view where job_id = {} and status != 4".format(job_id)
+            query = "select count(mpid) from job_source_view where mpid in (select mpid from job_id_and_mpid where job_id = {}) and status != 4".format(job_id)
             cur.execute(query)
             cnt_mpid = cur.fetchone()[0]
 
@@ -1546,7 +1431,7 @@ class JobManager(Resource): # added by mwseo
     def get_num_of_product_in_job(self, job_id):
         try:
             cur = conn.cursor()
-            query = "select count(mpid) from job_source_view where job_id = {} and status != 4".format(job_id)
+            query = "select count(mpid) from job_source_view where mpid in (select mpid from job_id_and_mpid where job_id = {}) and status != 4".format(job_id)
             cur.execute(query)
             result = cur.fetchone()
             conn.commit()
@@ -1740,7 +1625,6 @@ class TargetSiteManager(Resource): # added by mwseo
             label = label.encode('UTF-8','strict').hex()
             url = url.encode('UTF-8','strict').hex()
             gateway = gateway.encode('UTF-8','strict').hex()
-            #print(label)
             query = "insert into targetsite (user_id, name, gateway, url, registration_date) values ('"
             query += user_id + "', '" + label + "','" +gateway+"', '" + url + "', now()) returning id;"
             cur.execute(query)
@@ -2040,7 +1924,6 @@ class MySiteCategoryTreeManager(Resource):
             cur = conn.cursor()
             sql = "select count(*) from my_site_category_tree where user_id = '{}'".format(user_id)
             cur.execute(sql)
-            #print(cur.fetchone()[0])
             if cur.fetchone()[0] == 0:
                self.add_category_tree(category, user_id)
             else:
@@ -2158,7 +2041,6 @@ class ShippingFeeManager(Resource):
     def add_shipping_fees(self, user_id, company_id, fee_json, country):
         try:
             cur = conn.cursor()
-            #print(company_id)
             fee_arr = json.loads(fee_json)
 
             sql = "delete from shipping_fee where user_id = '" + user_id +"' and delivery_company_id = " + company_id + " and country ='"+country+ "';"
@@ -2168,7 +2050,6 @@ class ShippingFeeManager(Resource):
             sql = "insert into shipping_fee (user_id, delivery_company_id, min_kg, max_kg, fee,country) values"
             for val in fee_arr:
                 sql += "('" + user_id + "', " + company_id + ", " + val['min_kg'] + ", " + val['max_kg'] + ", " + val['fee'] + ", '"+ country+"'),"
-            #print(sql[:-1] + ";")
             cur.execute(sql[:-1] + ";")
             conn.commit()
             return { "success": True }
@@ -2266,10 +2147,8 @@ class PricingInformationManager(Resource):
             cur = conn.cursor()
             mpid = int(mpid)
             query = "select min_margin, margin_rate, min_price, shipping_cost from selected_mpid_pricing_information where job_id = {} and mpid = {}".format(job_id, mpid)
-            print(query)
             cur.execute(query)
             result = cur.fetchall()
-            print(result)
             conn.commit()
             return { "success": True, "result" : result }
         except:
@@ -2521,11 +2400,11 @@ class ProductListManager(Resource):
         try:
             cur = conn.cursor()
             statu = int(statu)
+            
             if statu == -1:
-               query = "select mpid, name, url, price, shipping_price, brand, weight, shipping_weight, shipping_price1, source_site_product_id, status, image_url, currency, stock, num_options, num_images from job_source_view where job_id = {} and status != 4".format(job_id)
+               query = "select mpid, name, url, price, shipping_price, brand, weight, shipping_weight, shipping_price1, source_site_product_id, status, image_url, currency, stock, num_options, num_images from job_source_view where mpid in (select mpid from job_id_and_mpid where job_id = {}) and status != 4".format(job_id)
             else:
-               query = "select mpid, name, url, price, shipping_price, brand, weight, shipping_weight, shipping_price1, source_site_product_id, status, image_url, currency, stock, num_options, num_images from job_source_view where job_id = {} and status = {};".format(job_id, statu)
-            #print(query)
+               query = "select mpid, name, url, price, shipping_price, brand, weight, shipping_weight, shipping_price1, source_site_product_id, status, image_url, currency, stock, num_options, num_images from job_source_view where mpid in (select mpid from job_id_and_mpid where job_id = {})  and status = {};".format(job_id, statu)
             cur.execute(query)
             result = cur.fetchall()
             if len(result) == 0:
@@ -2545,7 +2424,6 @@ class ProductListManager(Resource):
                               pass
                         t = tuple(lst)
                         result[idx] = t
-                
             return { "success": True, "result" : result }
         except:
             conn.rollback()
@@ -2650,7 +2528,6 @@ class ProductListManager(Resource):
             for key in ['sm_date', 'status', 'c_date', 'stock', 'image_url', 'url', 'name', 'price', 'currency', 'shipping_price', 'brand', 'weight', 'shipping_weight', 'source_site_product_id', 'option_value', 'pricing_information', 'brand', 'mpid']:
                 if key == 'pricing_information':
                     if tmp_result.get('pricing_information','') != '' and (tmp_result.get('status','') != '3' or tmp_result.get('status','') != '0'):
-                        print(tmp_result.get('status',''))
                         for inner_key in tmp_result[key].keys():
                             results[inner_key] = tmp_result[key][inner_key]
                 elif key == 'option_value':
@@ -2724,7 +2601,7 @@ class ProductListManager(Resource):
             for res in result:
                job_id = res[0]
                # select * from job_source_view where sm_date >= timestamp '2020-09-10 20:00:00'; 
-               query = "select mpid from job_source_view where job_id = {} and sm_date < {}".format(job_id, time_condition)
+               query = "select mpid from job_id_and_mpid where job_id = {} and sm_date < {}".format(job_id, time_condition)
                cur.execute(query)
                result2 = cur.fetchall()
                for res in result2:
@@ -2748,7 +2625,6 @@ class ProductListManager(Resource):
 
     def get_crawled_data_history(self, job_id):
         try:
-            print('get crawled data history')
             query = "select my_product_id, url from url_to_mpid where concat(\'\"\',url,\'\"\') in (select distinct value::text from node_property where node_id in (select id from node where task_id in (select id from task where stage_id in (select max(id) from stage where execution_id in (select id from execution where job_id = {}) group by execution_id))) and key = 'url')".format(job_id)
             cur = conn.cursor()
             cur.execute(query)
@@ -2762,7 +2638,6 @@ class ProductListManager(Resource):
 
     def get_crawled_time(self, job_id, url):
         try:
-            print('get crawled time')
             query = "select node_id from node_property where node_id in (select id from node where task_id in (select id from task where stage_id in (select max(id) from stage where execution_id in (select id from execution where job_id = {}) group by execution_id))) and key = 'url' and value::text='\"{}\"' order by node_id desc;".format(job_id, url)
             cur = conn.cursor()
             cur.execute(query)
@@ -2813,7 +2688,6 @@ class ProductListManager(Resource):
 
     def get_product_detail(self, node_id):
         try:
-            print('get crawled time')
             query = "select key, value from node_property where node_id = {}".format(node_id)
             cur = conn.cursor()
             cur.execute(query)
@@ -2914,7 +2788,6 @@ class ExchangeRateManager(Resource):
             
             response = requests.request("GET", url, headers=headers, data = payload)
             
-            print(response.text.encode('utf8'))
 
             tree = html.fromstring(response.text)
             #exchange_rate_str = tree.xpath('//div[@id="showTable"]//tr[1]//td[5]/text()')
@@ -2922,7 +2795,6 @@ class ExchangeRateManager(Resource):
             nation_list = tree.xpath('//div[@id="showTable"]//tr//td[@scope="row"]//a/text()')
             exchange_rate_list = tree.xpath('//div[@id="showTable"]//tr//td[5]/text()') 
             update_time = tree.xpath('//div[@class="hitday_area s7"]//span[@class="hitday"]/text()')
-            #print("exchange_rate: ", float(exchange_rate_str[0].replace(',','')))        
              
             new_exchange_rate_list = []
             new_nation_list = []
@@ -2942,20 +2814,15 @@ class ExchangeRateManager(Resource):
                if idx %2 == 0:
                   new_nation_list.append(val.replace('\r\n','').strip())
                       
-            #print(new_nation_list)
-            #print(new_exchange_rate_list)
             nation_er_list = {}
             for idx, val in enumerate(new_nation_list):
                nation_er_list[new_nation_list[idx]] = new_exchange_rate_list[idx]
             exchange_rate_with_fees = 1300
             result = ""
             #조회기준고시회차 :&nbsp;2021.02.08 &nbsp;127회차&nbsp;&nbsp;적용시각 : 16:21:49
-            #print(update_time[0]) 
             update_time_str = update_time[0].split('\xa0')[1].split(' ')[0] + ' ' +update_time[0].split('\xa0')[4].split(' ')[2]
-            #print(update_time_str) 
             conn.commit()
             query = "insert into exchange_rate(user_id, exchange_rate, update_time) values('"+user_id+"','"+ json.dumps(nation_er_list)+ "','"+update_time_str+ "')"
-            #print(query)
             cur = conn.cursor()
             cur.execute(query)
             conn.commit()
@@ -3577,7 +3444,7 @@ dag = DAG(dag_id="''' + job_label + '''",
               scheduling_code_for_airflow +='''
 #crawling
 t1 = BashOperator(task_id="'''+job_label+'''_crawling",
-                  bash_command='/home/pse/.pyenv/shims/python /home/pse/pse-driver/pse_driver.py --c run_from_db --wf '''+str(upid)+''' --job_id ''' + job_id + '''',
+                  bash_command='python /home/pse/pse-driver/pse_driver.py --c run_from_db --wf '''+str(upid)+''' --job_id ''' + job_id + '''',
                   dag=dag)'''
 
             if check_m == True:
@@ -3592,7 +3459,7 @@ t1 = BashOperator(task_id="'''+job_label+'''_crawling",
               
 # my site update / upload
 t2 = BashOperator(task_id="'''+job_label+'''_StoM",
-                  bash_command='/home/pse/.pyenv/shims/python /home/pse/pse-driver/pse_driver.py --c update_to_mysite --job_id '''+job_id+''' --groupbykey '''+groupby_key + ''' ', dag=dag)
+                  bash_command='python /home/pse/pse-driver/pse_driver.py --c update_to_mysite --job_id '''+job_id+''' --groupbykey '''+groupby_key + ''' ', dag=dag)
 
 '''
 
@@ -3601,7 +3468,7 @@ t2 = BashOperator(task_id="'''+job_label+'''_StoM",
                 scheduling_code_for_airflow +='''
 # target site upload
 upload''' +str(tjcid[0]) +''' = BashOperator(task_id="'''+job_label+'''_MtoT'''+str(tjcid[0])+'''",
-                  bash_command='/home/pse/.pyenv/shims/python /home/pse/pse-driver/cafe24_driver.py --cafe24_c run_scheduled --job_id ''' + job_id + ''' --cafe24_host 127.0.0.1 --target_id ''' + str(tjcid[0]) + ''' --cafe24_port 6379 --cafe24_queue cafe24_queue', 
+                  bash_command='python /home/pse/pse-driver/cafe24_driver.py --cafe24_c run_scheduled --job_id ''' + job_id + ''' --cafe24_host 127.0.0.1 --target_id ''' + str(tjcid[0]) + ''' --cafe24_port 6379 --cafe24_queue cafe24_queue', 
                   dag=dag)
 
 '''
@@ -3778,7 +3645,6 @@ api.add_resource(AccountManager, '/api/db/account')
 api.add_resource(ProjectManager, '/api/db/project')
 #api.add_resource(UserProgramTempManager, '/api/db/userprogramtemp')
 
-api.add_resource(ExecutionsTempManager, '/api/db/executions_temp')
 api.add_resource(GroupManager, '/api/db/group')
 api.add_resource(JobManager, '/api/db/job')
 api.add_resource(TargetSiteManager, '/api/db/targetsite')
