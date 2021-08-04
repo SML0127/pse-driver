@@ -294,21 +294,158 @@ class PseDriver():
                 sm_history_id, -2, err_msg)
         return
 
+
     def update_to_mysite(self, args):
         sm_history_id = -1
-        err_op = 'Logging update my site'
+        err_op = 'Logging before update my site'
         try:
+            # Calculate update start date
             utcnow = datetime.utcnow()
             time_gap = timedelta(hours=9)
             kor_time = utcnow + time_gap
             start_date = datetime.strptime(
                 str(kor_time), "%Y-%m-%d %H:%M:%S.%f").strftime("%Y-%m-%d %H:%M:%S")
 
+            # Get lastest exeuction id and crawling date
             exec_id, c_date = self.log_manager.get_lastest_execution_id_using_job_id(
                 args.job_id)
             c_date = datetime.strptime(
                 str(c_date), "%Y-%m-%d %H:%M:%S.%f").strftime("%Y-%m-%d %H:%M:%S")
-            # c_date =  2021-04-20 20:46:13.528656
+            
+            # Logging update start date
+            history_id = self.graph_manager.insert_sm_history(
+                exec_id, start_date, args.job_id)
+            sm_history_id = history_id
+            self.graph_manager.update_last_sm_date_in_job_configuration(
+                start_date, args.job_id)
+            print_flushed('Execution id: ', exec_id)
+
+            # Get duplicate check keys of job
+            groupby_keys_array = self.graph_manager.get_groupby_key(args.job_id)
+            groupby_keys = [] 
+            for idx in groupby_keys_array:
+                groupby_keys.append(str(idx))
+            args.groupbykey = groupby_keys
+
+            # Get crawled item from jobs
+            node_ids = self.graph_manager.find_nodes_of_execution(exec_id)
+            print_flushed('Groupby key: ', args.groupbykey)
+            print_flushed(
+                '====================== Transform to mysite schema ======================')
+            print_flushed('============  Delete deleted items of job id = {}  ============='.format(args.job_id))
+
+            # Delete deleted item from my site
+            err_op = 'Delete deleted product in my site'
+            self.graph_manager.delete_deleted_product_in_mysite_new(args.job_id)
+            cur_time = datetime.utcnow() + time_gap
+            cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
+            self.graph_manager.re_log_to_job_current_mysite_working(
+                '\n{}\n[Running]  Update mysite'.format(cur_time), args.job_id)
+
+            mpid = 0
+            num = 0
+            log_mpid = ''
+            log_url = ''
+            num_out_of_stock = 0
+            print_flushed("# of items: ", len(node_ids))
+
+            for node_id in node_ids:
+                try:
+                    node_properties = self.graph_manager.get_node_properties(node_id)
+                    node_properties['c_date'] = c_date
+                    log_url = node_properties.get('url', '')
+                    mpid = node_properties['mpid']
+                    log_mpid = mpid
+                
+                    # Transform data schema for mysite
+                    result = self.transform_node_property_for_mysite(
+                        node_id, node_properties)
+                    if result is False:
+                        num_out_of_stock = num_out_of_stock + 1
+                        continue
+                    num = num + 1
+                    if num % 50 == 0:
+                        cur_time = datetime.utcnow() + time_gap
+                        cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
+                        self.graph_manager.log_to_job_current_mysite_working(
+                            '\n{}\n[Running] Insert an Update {} items to mysite'.format(cur_time, num), args.job_id)
+                        print_flushed("Current # of inserted items to mysite : ", num)
+                    
+                    # Insert and Update   
+                    self.graph_manager.insert_node_property_to_mysite(
+                        args.job_id, mpid, result, args.groupbykey, sm_history_id)
+              
+
+                except:
+                    err_msg = '================================ Operator ================================ \n'
+                    err_msg += 'Update my site' + '\n\n'
+                    err_msg += '================================ My site product id ================================ \n'
+                    err_msg += 'My site product id: ' + \
+                        str(log_mpid) + '\n\n'
+                    err_msg += '================================ Source site URL ================================ \n'
+                    err_msg += 'URL: ' + log_url + '\n\n'
+                    err_msg += '================================ STACK TRACE ============================== \n' + \
+                        str(traceback.format_exc())
+                    print(str(traceback.format_exc()))
+                    self.graph_manager.log_err_msg_of_my_site(
+                        sm_history_id, mpid, err_msg)
+
+            print_flushed("# of inserted items to mysite : ", num)
+            self.graph_manager.log_to_job_current_mysite_working(
+                '\n{}\n[Running] Insert an Update {} items to mysite'.format(cur_time, num), args.job_id)
+            if num_out_of_stock != 0:
+                self.graph_manager.log_to_job_current_mysite_working(
+                    '\n{}\n[Running] Do not insert {} items to mysite because of out of stock (before update)'.format(cur_time, num_out_of_stock), args.job_id)
+            print_flushed(
+                '====================== Set status of deleted items in mysite ====================')
+            num_deleted = self.graph_manager.set_status_for_deleted_in_mysite(args.job_id, c_date)
+            print_flushed("# of delete items in mysite: ", num_deleted)
+            err_op = 'Delete duplicated item'
+            print_flushed(
+                '====================== Delete duplicated items in mysite ====================')
+            num_duplicated = self.graph_manager.set_status_for_duplicated_data_new(
+                args.job_id)
+            print_flushed("# of duplicated items in mysite: ", num_duplicated)
+            self.graph_manager.log_to_job_current_mysite_working(
+                '\nDuplicated {} items.'.format(num_duplicated), args.job_id)
+            
+
+        except:
+            err_msg = '================================ Operator ================================ \n'
+            err_msg += ' ' + err_op  + '\n\n'
+            err_msg += '================================ STACK TRACE ============================== \n' + \
+                str(traceback.format_exc())
+            self.graph_manager.log_err_msg_of_my_site(
+                sm_history_id, -1, err_msg)
+
+            print_flushed(traceback.format_exc())
+            raise
+        utcnow = datetime.utcnow()
+        time_gap = timedelta(hours=9)
+        kor_time = utcnow + time_gap
+        end_date = datetime.strptime(
+            str(kor_time), "%Y-%m-%d %H:%M:%S.%f").strftime("%Y-%m-%d %H:%M:%S")
+        self.graph_manager.update_sm_history(end_date, sm_history_id)
+        return
+
+    def update_to_mysite_old(self, args):
+        sm_history_id = -1
+        err_op = 'Logging update my site'
+        try:
+            # Calculate update start date
+            utcnow = datetime.utcnow()
+            time_gap = timedelta(hours=9)
+            kor_time = utcnow + time_gap
+            start_date = datetime.strptime(
+                str(kor_time), "%Y-%m-%d %H:%M:%S.%f").strftime("%Y-%m-%d %H:%M:%S")
+
+            # Get lastest exeuction id and crawling date
+            exec_id, c_date = self.log_manager.get_lastest_execution_id_using_job_id(
+                args.job_id)
+            c_date = datetime.strptime(
+                str(c_date), "%Y-%m-%d %H:%M:%S.%f").strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Logging update start date
             history_id = self.graph_manager.insert_sm_history(
                 exec_id, start_date, args.job_id)
             sm_history_id = history_id
@@ -316,11 +453,14 @@ class PseDriver():
                 args.job_id)
             print_flushed("Is update ? ", is_update)
 
+            # Get duplicate check keys of job
             groupby_keys_array = self.graph_manager.get_groupby_key(args.job_id)
             groupby_keys = [] 
             for idx in groupby_keys_array:
                 groupby_keys.append(str(idx))
             args.groupbykey = groupby_keys
+
+
             self.graph_manager.update_last_sm_date_in_job_configuration(
                 start_date, args.job_id)
             if is_update == True:  # Update
@@ -343,6 +483,7 @@ class PseDriver():
                 log_url = ''
                 num_out_of_stock = 0
                 print_flushed("# of items: ", len(node_ids))
+
                 for node_id in node_ids:
                     try:
                         node_properties = self.graph_manager.get_node_properties(
@@ -351,6 +492,8 @@ class PseDriver():
                         log_url = node_properties.get('url', '')
                         mpid = node_properties['mpid']
                         log_mpid = mpid
+
+                        # Transform data schema for mysite
                         result = self.transform_node_property_for_mysite(
                             node_id, node_properties)
                         if result is False:
@@ -363,6 +506,8 @@ class PseDriver():
                             self.graph_manager.log_to_job_current_mysite_working(
                                 '\n{}\n[Running] Insert {} items to mysite (before update)'.format(cur_time, num), args.job_id)
                             print_flushed("Current # of inserted items to mysite : ", num)
+
+                        # Insert and Update   
                         self.graph_manager.insert_node_property_to_tmp_mysite(
                             args.job_id, result, args.groupbykey)
                     except:
@@ -380,8 +525,9 @@ class PseDriver():
                 # update
                 self.graph_manager.log_to_job_current_mysite_working(
                     '\n{}\n[Running] Insert {} items to mysite (before update)'.format(cur_time, num), args.job_id)
-                self.graph_manager.log_to_job_current_mysite_working(
-                    '\n{}\n[Running] Do not insert {} items to mysite because of out of stock (before update)'.format(cur_time, num_out_of_stock), args.job_id)
+                if num_out_of_stock != 0:
+                    self.graph_manager.log_to_job_current_mysite_working(
+                        '\n{}\n[Running] Do not insert {} items to mysite because of out of stock (before update)'.format(cur_time, num_out_of_stock), args.job_id)
                 print_flushed("Current # of inserted items to mysite : ", num)
                 print_flushed('====================== Update mysite ====================')
                 self.graph_manager.update_mysite(args.job_id, sm_history_id)
@@ -517,15 +663,10 @@ class PseDriver():
             result_for_desc['value'] = {}
 
             num_option = 0
+            mysite_columns = self.graph_manager.get_mysite_column_name()
             for key in sorted(node_properties.keys()):
-                if key not in ['mpid', 'url', 'name', 'price', 'stock', 'images', 'option_list', 'option_matrix', 'images', 'front_image', 'brand', 'shipping_price', 'weight', 'shipping_weight', 'source_site_product_id']:
-                    result_for_desc['key'].append(key)
-                    if key == 'description':
-                        desc = re.sub(cleaner_dquotation, '',node_properties.get(key, ""))
-                        desc = re.sub(cleaner_quotation, '', desc)
-                        result_for_desc['value'][key] = desc
-                    else:
-                        result_for_desc['value'][key] = node_properties.get(
+                if key not in mysite_columns:
+                    result_for_desc['value'][key] = node_properties.get(
                             key, None)
                 elif key in ['option_list', 'option_matrix']:
                     if node_properties.get(key, None) != {}:

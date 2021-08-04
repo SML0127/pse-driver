@@ -7,6 +7,7 @@ import cfscrape
 import pathlib
 import sys
 import string
+import time
 from io import BytesIO
 from PIL import Image
 import requests
@@ -131,7 +132,456 @@ class GraphManager():
             print_flushed(str(traceback.format_exc()))
             raise e
 
-    def update_mysite(self, job_id, sm_history_id):
+    def set_status_for_duplicated_data_new(self, job_id):
+        try:
+            query = 'select count(*) from job_source_view_new where id in (select id from job_source_view_new where mpid in (select mpid from job_id_and_mpid where job_id = {}) and id not in ( select min(id) from job_source_view_new group by groupby_key_sha256));'.format(job_id)
+            self.gp_cur.execute(query)
+            result = self.gp_cur.fetchone()[0]
+            self.gp_conn.commit()
+            return result
+        except:
+            self.gp_conn.rollback()
+            print_flushed(str(traceback.format_exc()))
+            raise
+
+
+    def set_status_for_deleted_in_mysite(self, job_id, c_date):
+        try:
+            query = "update job_source_view_new set status = 3, sm_date = now() where c_date != '{}' and mpid in (select mpid from job_id_and_mpid where job_id = {}); select count(*) from job_source_view_new where status = 3 and mpid in (select mpid from job_id_and_mpid where job_id = {})".format(c_date, job_id, job_id)
+            self.gp_cur.execute(query)
+            num_set_deleted = self.gp_cur.fetchone()[0]
+            self.gp_conn.commit()
+            return num_set_deleted
+        except:
+            self.gp_conn.rollback()
+            print_flushed(str(traceback.format_exc()))
+            raise
+
+
+
+    def delete_deleted_product_in_mysite_new(self, job_id):
+        try:
+            query = "select mpid from job_source_view_new where status = 3 and mpid not in (select mpid from tpid_mapping) and mpid in (select mpid from job_id_and_mpid where job_id = {}) ".format(job_id)
+            self.gp_cur.execute(query)
+            rows = self.gp_cur.fetchall()
+            deleted_mpids = [int(row[0]) for row in rows]
+            print_flushed("# of deleted (except uploaded items): ",len(deleted_mpids))
+
+            if len(deleted_mpids) != 0:
+                mpids_str = '('
+                for mpid in deleted_mpids:
+                    mpids_str += str(mpid) + ', '
+                mpids_str = mpids_str[0:-2] + ')'
+
+                query_thumbnail = "delete from job_thumbnail_source_view_new where mpid in " + mpids_str
+                query_option = "delete from job_option_source_view_new where mpid in " + mpids_str
+                query_desc = "delete from job_description_source_view_new where mpid in " + mpids_str
+                query_origin = "delete from job_source_view_new where mpid in " + mpids_str
+                
+                query_job_id_and_mpid = "delete from job_id_and_mpid where mpid in " + mpids_str
+
+                query = "BEGIN; " + query_origin + ';' + query_desc + ';' + query_thumbnail + '; '+ query_option + ';' + query_job_id_and_mpid + ';COMMIT;'
+                self.gp_cur.execute(query)
+                self.gp_conn.commit()
+
+                return
+        except:
+            self.gp_conn.rollback()
+            raise
+
+
+    def insert_product_to_mysite(self, job_id, value, groupbykeys):
+        try:
+            start = time.time()
+            query = 'INSERT INTO job_source_view (mpid, status, c_date, sm_date, url, url_sha256, name, name_sha256, price, stock, image_url, num_options, num_images, groupby_key_sha256, source_site_product_id, brand, weight, shipping_price, shipping_weight, description, description1, description2, description_rendered, description1_rendered, description2_rendered, shipping_price1, description_sha256)'
+            query += 'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s); COMMIT'
+
+            mpid = self.none_to_blank(
+                str(value['result_for_source_view']['my_product_id']))
+            status = self.none_to_blank(
+                str(value['result_for_source_view']['status']))
+            c_date = self.none_to_blank(
+                str(value['result_for_source_view']['c_date']))
+            sm_date = self.none_to_blank(
+                str(value['result_for_source_view']['sm_date']))
+            url = self.none_to_blank(
+                str(value['result_for_source_view']['url']))
+            url_sha256 = str(hashlib.sha256(
+                url.encode('UTF-8', 'strict')).hexdigest())
+            name_origin = self.none_to_blank(
+                str(value['result_for_source_view']['name']))
+            name = str(name_origin.encode('UTF-8', 'strict').hex())
+            name_sha256 = str(hashlib.sha256(
+                name_origin.encode('UTF-8', 'strict')).hexdigest())
+            price = self.none_to_blank(
+                str(value['result_for_source_view']['price']))
+            if value['result_for_source_view']['stock'] == 'null' or value['result_for_source_view']['stock'] is None:
+                print_flushed(
+                    "Out ot stock. mpid = {}, url = {}".format(mpid, url))
+                return False
+            stock = self.check_stock(value['result_for_source_view'])
+            if stock == '0':
+                print_flushed(
+                    "Out ot stock. mpid = {}, url = {}".format(mpid, url))
+                return False
+            image_url = self.none_to_blank(
+                str(value['result_for_source_view'].get('image_url', '')))
+            num_options = self.none_to_blank(
+                str(value['result_for_source_view']['num_options']))
+            num_images = self.none_to_blank(
+                str(value['result_for_source_view']['num_images']))
+            source_site_product_id = self.none_to_blank(str(value['result_for_source_view']['source_site_product_id']))
+            brand = self.none_to_blank(str(value['result_for_source_view'].get('brand', '')))
+            weight = self.none_to_blank(str(value['result_for_source_view'].get('weight', '')))
+            shipping_weight = self.none_to_blank(str(value['result_for_source_view'].get('shipping_weight', '')))
+            shipping_price = self.none_to_blank(str(value['result_for_source_view'].get('shipping_price', '')))
+            shipping_price1 = self.none_to_blank(
+                str(value['result_for_source_view'].get('shipping_price1', '')))
+            description = self.none_to_blank(
+                str(value['result_for_source_view'].get('description', ''))).encode('UTF-8').hex()
+
+            description_sha256 = str(hashlib.sha256(self.none_to_blank(str(value['result_for_source_view'].get('description', ''))).encode()).hexdigest())
+                
+            description1 = self.none_to_blank(
+                str(value['result_for_source_view'].get('description1', ''))).encode('UTF-8').hex()
+            description2 = self.none_to_blank(
+                str(value['result_for_source_view'].get('description2', ''))).encode('UTF-8').hex()
+            description_rendered = self.none_to_blank(
+                str(value['result_for_source_view'].get('description_rendered', ''))).encode('UTF-8').hex()
+            description1_rendered = self.none_to_blank(
+                str(value['result_for_source_view'].get('description1_rendered', ''))).encode('UTF-8').hex()
+            description2_rendered = self.none_to_blank(
+                str(value['result_for_source_view'].get('description2_rendered', ''))).encode('UTF-8').hex()
+
+
+            groupbykeys = sorted(groupbykeys)
+            groupby_key = ''
+            mysite_columns = self.get_mysite_column_name()
+            for key in groupbykeys:
+                if key not in mysite_columns:
+                    groupby_key += value['result_for_desc']['value'].get(
+                        'description', '')
+                else:
+                    groupby_key += self.none_to_blank(
+                        str(value['result_for_source_view'][key]))
+            groupby_key = str(groupby_key)
+            groupby_key_sha256 = str(hashlib.sha256(
+                groupby_key.encode()).hexdigest())
+            self.gp_cur.execute(query, (mpid, status, c_date, sm_date, url, url_sha256, name, name_sha256, price, stock, image_url, num_options, num_images, groupby_key_sha256, source_site_product_id, brand, weight, shipping_price, shipping_weight, description, description1, description2, description_rendered, description1_rendered, description2_rendered, shipping_price1, description_sha256))
+            self.gp_conn.commit()
+            print('I1: ', time.time() - start)
+
+            start = time.time()
+            query = "select id, key_name from mysite_translate_key where job_id = {}".format(job_id);
+            self.gp_cur.execute(query)
+            result = self.gp_cur.fetchall()
+            option_translate = False
+            if result is not None:
+                translate_keys = []
+                for idx, val in enumerate(result):
+                   for idx2, val2 in enumerate(val):
+                      if idx2 == 1:
+                         if is_hex_str(val2) == False:
+                            translate_keys.append(val2)
+                         else:
+                            translate_keys.append(bytes.fromhex(val2).decode())
+                if len(translate_keys) != 0:
+                    translator = Translator()
+                    if val != 'option':
+                        for idx, val in translate_keys:
+                            translated_text = ''
+                            try:
+                                translated_text = translator.translate(value['result_for_source_view'][val], src='ja', dest="ko").text
+                            except:
+                                pass
+                            if translated_text != '':
+                                query = 'update job_soure_view set {}_translated = {} where mpid = {}; COMMIT;'.format(val, translated_text, mpid)
+                                self.gp_cur.execute(query)
+                                self.gp_conn.commit()
+                    else:
+                        option_translate = True
+            print('I2: ', time.time() - start)
+
+            start = time.time()
+            # insert data to description_source_view
+            # (job_id integer, mpid integer, key varchar(2048), value text)
+            query = 'INSERT INTO job_description_source_view (mpid, key, value) '
+            query += 'VALUES (%s, %s, %s); COMMIT'
+            mpid = int(value['result_for_desc']['my_product_id'])
+            for key in value['result_for_desc']['key']:
+                #if key == 'description':
+                #    attr = self.none_to_blank(
+                #        str(value['result_for_desc']['value'][key]))
+                #    self.gp_cur.execute(query, (str(mpid), 'description_sha256', str(
+                #        hashlib.sha256(attr.encode()).hexdigest())))
+                attr = str(value['result_for_desc']['value'][key])
+                attr = attr.encode('UTF-8').hex()
+                self.gp_cur.execute(query, (mpid, key, attr))
+            self.gp_conn.commit()
+            print('I3: ', time.time() - start)
+
+            start = time.time()
+            # insert data to option_source_view
+            query = 'INSERT INTO job_option_source_view (mpid, option_name, option_value, list_price, price, stock, stock_status, msg) '
+            query += 'VALUES (%s, %s, %s, %s, %s, %s, %s, %s); COMMIT'
+            mpid = str(value['result_for_option']['my_product_id'])
+            for option_name in value['result_for_option']['option_names']:
+                option_name_translated = ''
+                if option_translate == True:
+                    try:
+                        option_name_translated = translator.translate(option_name, src='ja', dest="ko").text
+                    except:
+                        pass
+                for option_val in value['result_for_option']['option_values'][option_name]:
+                    list_price = self.none_to_blank(
+                        str(value['result_for_option']['list_price']))
+                    price = self.none_to_blank(
+                        str(value['result_for_option']['price']))
+                    stock = self.check_stock(value['result_for_option'])
+                    stock_status = self.none_to_blank(
+                        str(value['result_for_option']['stock_status']))
+                    msg = self.none_to_blank(
+                        str(value['result_for_option']['msg']))
+                    option_val_translated = ''
+                    if option_translate == True:
+                        try:
+                            option_val_translated = translator.translate(option_val, src='ja', dest="ko").text
+                        except:
+                            pass
+                    #self.gp_cur.execute(query, (job_id, mpid, str((option_name.encode().hexdigest())), str((option_val.encode('UTF-8').hexdigest())), list_price, price, stock, stock_status, msg))
+                    self.gp_cur.execute(query, (mpid, option_name.encode().hex(
+                    ), option_val.encode('UTF-8').hex(), list_price, price, stock, stock_status, msg, option_name_translated.encode('UTF-8').hex(), option_val_translated.encode('UTF-8').hex()))
+            self.gp_conn.commit()
+
+            # insert data to thumbnail_source_view
+            # (mpid integer, image_url varchar(2048), image_url_sha256 varchar(64))
+            query = 'INSERT INTO job_thumbnail_source_view (mpid, image_url, image_url_sha256)'
+            query += 'VALUES (%s, %s, %s); COMMIT'
+            mpid = str(value['result_for_option']['my_product_id'])
+            for img_url in value['result_for_thumbnail']['image_urls']:
+                self.gp_cur.execute(query, (mpid, str(img_url), str(hashlib.sha256(img_url.encode()).hexdigest())))
+            self.gp_conn.commit()
+            print('I4: ', time.time() - start)
+
+        except:
+           self.gp_conn.rollback()
+           print_flushed('?????????????????')
+           print_flushed(str(traceback.format_exc()))
+           raise       
+        return True
+
+    def insert_node_property_to_mysite(self, job_id, mpid, new_product, groupbykeys, sm_history_id):
+        try:
+            # insert data to source_view
+            job_id = str(job_id)
+
+            start = time.time()
+            query = "select count(mpid) from job_id_and_mpid where mpid = {};".format(mpid)
+            self.gp_cur.execute(query)
+            is_exist = self.gp_cur.fetchone()[0]
+            print('First: ', time.time() - start)
+
+            # New item -> insert
+            if int(is_exist) == 0:
+                # Insert to my site
+                start = time.time()
+                query = "BEGIN;insert into job_id_and_mpid(job_id, mpid) values({}, {});COMMIT".format(job_id, mpid)
+                self.gp_cur.execute(query)
+                self.gp_conn.commit()
+                print('Second: ', time.time() - start)
+                start = time.time()
+                res = self.insert_product_to_mysite(job_id, new_product, groupbykeys)
+                print('Third: ', time.time() - start)
+                if res != True: 
+                    start = time.time()
+                    query = "BEGIN;delete from job_id_and_mpid where job_id = {} and mpid = {}; COMMIT;".format(job_id, mpid)
+                    self.gp_cur.execute(query)
+                    self.gp_conn.commit()
+                    print('Fourth: ', time.time() - start)
+                    start = time.time()
+                    query = "select count(*) from job_id_and_mpid where mpid = {};".format(mpid)
+                    self.gp_cur.execute(query)
+                    is_exist = self.gp_cur.fetchone()[0]
+                    print('Fifth: ', time.time() - start)
+                    if int(is_exist) == 0:
+                        start = time.time()
+                        query = "BEGIN;delete from job_source_view where mpid = {}; delete from job_description_source_view where mpid = {};delete from job_thumbnail_source_view where mpid = {};delete from job_option_source_view where mpid = {};COMMIT;".format(mpid, mpid, mpid, mpid)
+                        self.gp_cur.execute(query)
+                        self.gp_conn.commit()
+                        print('Sixth: ', time.time() - start)
+
+            # Existing item -> update
+            else:
+                # If current stock is zero => change staet as deleted
+                if new_product['result_for_source_view']['stock'] == 'null' or new_product['result_for_source_view']['stock'] is None or new_product['result_for_source_view']['stock'] == '':
+                    print_flushed(
+                        "Out ot stock. mpid = {}, url = {}".format(mpid, url))
+                    query = "update job_source_view_new set status = 3 where mpid = {};COMMIT".format(
+                        mpid)
+                    return
+                stock = self.check_stock(new_product['result_for_source_view'])
+                if stock == '0':
+                    print_flushed(
+                        "Out ot stock. mpid = {}, url = {}".format(mpid, url))
+                    query = "update job_source_view_new set status = 3 where mpid = {};COMMIT".format(
+                        mpid)
+                    return
+
+                # new_product = {result_for_source_view : {my_product_id:1, ..}, result_for_thumbnail: {} ...}
+                # old_product = {mpid: 1,name: ~~,  ...}
+                old_product = self.get_node_properties_from_mysite_for_update(job_id, mpid)
+                self.update_mysite(job_id, old_product, new_product, mpid, sm_history_id, groupbykeys)
+
+        except:
+            self.gp_conn.rollback()
+            raise
+
+    def update_mysite(self, job_id, old_product, new_product, mpid, sm_history_id, groupbykeys):
+        try:
+            time_gap = timedelta(hours=9)
+            # 0 = up to date 1 = changed 2 = New 3 = Deleted
+            # new_product = {result_for_source_view : {my_product_id:1, ..}, result_for_thumbnail: {} ...}
+            # old_product = {mpid: 1,name: ~~,  ...}
+            up_to_date = 0
+            changed = 0
+            new_item = 0
+            deleted = 0
+            prd_in_other_job = 0
+            new_but_out_of_stock = 0
+            max_update_chunk = 30
+            update_chunk = 0
+            log_mpid = 0
+            try:
+                prd = {}
+                # New version
+                prd['prev_price'] = old_product.get('price', 0)
+                prd['new_price'] = new_product['result_for_source_view'].get('price', 0)
+                prd['v1_url'] = old_product.get('url', '')
+                prd['v2_url'] = new_product['result_for_source_view'].get('url', '')
+                prd['prev_stock'] = old_product.get('stock', 0)
+                prd['new_stock'] = new_product['result_for_source_view'].get('stock', 0)
+                prd['prev_num_options'] = old_product.get('num_options', 0)
+                prd['new_num_options'] = new_product['result_for_source_view'].get('num_options', 0)
+                prd['prev_option_name_list'] = sorted(list(old_product.get('option_name', {})))
+                prd['new_option_name_list'] = sorted(new_product['result_for_option'].get('option_names', []))
+                tmp_option_value_list = list(old_product.get('option_value', {}).values())
+                prd['prev_option_value_list'] = sorted([str(item) for sublist in tmp_option_value_list for item in sublist])
+                
+                tmp_option_value_list = list(new_product['result_for_option'].get('option_values', {}).values())
+                prd['new_option_value_list'] = sorted([str(item) for sublist in tmp_option_value_list for item in sublist])
+
+                prd['prev_image_url_sha256_list'] = sorted(old_product.get('images', []))
+                prd['new_image_url_sha256_list'] = sorted(new_product['result_for_thumbnail'].get('image_urls', []))
+
+                prd['prev_description_sha256'] = old_product.get('description_sha256', '')
+                prd['new_description_sha256'] = str(hashlib.sha256(new_product['result_for_desc'].get('value', {}).get('description', '').encode()).hexdigest())
+ 
+
+                log_mpid = mpid
+                new_prd_mpid = mpid
+                #new_prd_mpid = product[11]
+                prd['prev_name'] = old_product.get('name', '')
+                prd['new_name'] = new_product['result_for_source_view'].get(
+                    'name', '')
+                print_flushed('{} @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@'.format(mpid)) 
+                #print_flushed(prd) 
+                is_changed = False
+                is_new = False
+                #tpid = self.get_tpid(job_id, targetsite_url, mpid)
+                # temp
+                tpid = 1
+
+                # New / Up-to-date / Changed / Deleted
+                # 1) Deleted 2) Up-to-date 3) Changed
+                # Deleted: Stock -> 0
+                if prd['new_stock'] == 0:
+                    print_flushed('@@@@@ New stock zero') 
+                    c_date = new_product['result_for_source_view'].get('c_date', '')
+                    query = "update job_source_view set status = 3, stock = 0, c_date = '{}', sm_date = now() where mpid = {}".format(mpid, c_date)
+                    self.pg_cur.execute(query)
+                    self.pg_conn.commit()
+                else:
+                    #print_flushed('@@@@@ new stock not zero') 
+                    is_name_unchanged = (prd['prev_name'] == prd['new_name'])
+                    is_price_unchanged = (prd['prev_price'] == prd['new_price'])
+                    is_stock_unchanged = (prd['prev_stock'] == prd['new_stock'])
+                    is_num_options_unchanged = (prd['prev_num_options'] == prd['prev_num_options'])
+                    is_option_name_unchanged = (prd['prev_option_name_list'] == prd['new_option_name_list'])
+                    is_option_value_unchanged = (prd['prev_option_value_list'] == prd['new_option_value_list'])
+                    is_image_url_unchanged = (prd['prev_image_url_sha256_list'] == prd['new_image_url_sha256_list'])
+                    is_description_unchanged = (prd['prev_description_sha256'] == prd['new_description_sha256'])
+                    print_flushed(is_name_unchanged, is_price_unchanged, is_stock_unchanged, is_num_options_unchanged, is_option_name_unchanged, is_image_url_unchanged, is_description_unchanged)
+                    # 3) Changed
+                    if False in [is_name_unchanged, is_price_unchanged, is_stock_unchanged, is_num_options_unchanged, is_option_name_unchanged, is_image_url_unchanged, is_description_unchanged]:
+                        print_flushed("@@@@@ Changed")
+                        query = 'BEGIN; delete from job_source_view_new where mpid = {}; delete from job_description_source_view_new where mpid = {}; delete from job_thumbnail_source_view_new where mpid = {}; delete from job_option_source_view_new where mpid = {}; COMMIT;'.format(mpid, mpid, mpid, mpid)
+                        self.pg_cur.execute(query)
+                        self.pg_conn.commit()
+                        #print_flushed("-----INSERT---S")
+                        self.insert_product_to_mysite(job_id, new_product, groupbykeys)
+                        #print_flushed("-----INSERT---E")
+
+                    # 2) Up-to-date
+                    else:
+                        print_flushed('Up-to-date') 
+                        c_date = new_product['result_for_source_view'].get('c_date', '')
+                        query = "update job_source_view_new set status = 1, c_date = '{}', sm_date = now() where mpid = {};COMMIT;".format(c_date, mpid)
+                        self.pg_cur.execute(query)
+                        self.pg_conn.commit()
+
+
+                update_chunk += 1
+                if update_chunk == max_update_chunk:
+                    cur_time = datetime.utcnow() + time_gap
+                    cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
+                    self.log_to_job_current_mysite_working(
+                        '\n{}\n[Running] My site update\n'.format(cur_time), job_id)
+                    update_chunk = 0
+            except:
+                err_msg = '================================ STACK TRACE ============================== \n' + \
+                    str(traceback.format_exc())
+                print_flushed(str(traceback.format_exc()))
+                self.log_err_msg_of_my_site(sm_history_id, log_mpid, err_msg)
+
+            cur_time = datetime.utcnow() + time_gap
+            cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
+            #self.log_to_job_current_mysite_working('\n{}\n[Finished] \nUp-to-date: {} items\nChanged: {} items\n New: {} items\n Deleted: {} items\n'.format(cur_time, up_to_date, changed, new_item, deleted), job_id)
+            self.log_to_job_current_mysite_working(
+                '\n{}\n[Finished] My site update\n'.format(cur_time), job_id)
+
+            query = "select count(*) from job_source_view where job_id = {} and status = 0".format(job_id)
+            self.pg_cur.execute(query)
+            num_up_to_date = self.pg_cur.fetchone()[0]
+
+            query = "select count(*) from job_source_view where job_id = {} and status = 1".format(job_id)
+            self.pg_cur.execute(query)
+            num_updated = self.pg_cur.fetchone()[0]
+
+            query = "select count(*) from job_source_view where job_id = {} and status = 2".format(job_id)
+            self.pg_cur.execute(query)
+            num_new = self.pg_cur.fetchone()[0]
+
+            query = "select count(*) from job_source_view where job_id = {} and status = 3".format(job_id)
+            self.pg_cur.execute(query)
+            num_deleted = self.pg_cur.fetchone()[0]
+            self.log_to_job_current_mysite_working('Up-to-date: {} items\nChanged: {} items\n New: {} items\n Deleted: {} items\n'.format(
+                num_up_to_date, num_updated, num_new, num_deleted), job_id)
+
+            query = "insert into job_update_statistics_history(job_id, up_to_date, changed, new_item, deleted) values({}, {}, {}, {}, {})".format(
+                job_id, num_up_to_date, num_updated, num_new, num_deleted)
+            self.pg_cur.execute(query)
+            self.pg_conn.commit()
+
+        except:
+            self.pg_conn.rollback()
+            raise
+        finally:
+            self.pg_conn.commit()
+            return
+
+
+
+    def update_mysite_old(self, job_id, sm_history_id):
         try:
             query = "create view job"+job_id+"_update_view as (select v1.price as prev_price, v2.price new_price, v1.url as v1_url, v2.url as v2_url, v1.stock as prev_stock, v2.stock as new_stock, v1.num_options as prev_num_options, v2.num_options as new_num_options, v1.job_id as job_id1, v2.job_id as job_id2, v1.mpid as mpid, v2.mpid as prd2, v1.name_sha256 as prev_name, v2.name_sha256 as new_name from job_source_view as v1 full outer join job"+job_id+"_source_view_latest as v2 on v1.url_sha256 = v2.url_sha256)"
             self.pg_cur.execute(query)
@@ -903,180 +1353,174 @@ class GraphManager():
             print_flushed(str(traceback.format_exc()))
             raise
 
-    def insert_node_property_to_mysite(self, job_id, value, groupbykeys):
-        try:
+   # def insert_node_property_to_mysite_old(self, job_id, value, groupbykeys):
+   #     try:
 
-            # insert data to source_view
-            job_id = str(job_id)
-            query = 'INSERT INTO job_source_view (job_id, mpid, status, c_date, sm_date, url, url_sha256, name, name_sha256, price, stock, image_url, num_options, num_images, groupby_key_sha256, source_site_product_id, brand, weight, shipping_price, shipping_weight, description, description1, description2, description_rendered, description1_rendered, description2_rendered) '
-            query += 'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
+   #         # insert data to source_view
+   #         job_id = str(job_id)
+   #         query = 'INSERT INTO job_source_view (job_id, mpid, status, c_date, sm_date, url, url_sha256, name, name_sha256, price, stock, image_url, num_options, num_images, groupby_key_sha256, source_site_product_id, brand, weight, shipping_price, shipping_weight, description, description1, description2, description_rendered, description1_rendered, description2_rendered) '
+   #         query += 'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
 
-            mpid = self.none_to_blank(
-                str(value['result_for_source_view']['my_product_id']))
-            status = self.none_to_blank(
-                str(value['result_for_source_view']['status']))
-            c_date = self.none_to_blank(
-                str(value['result_for_source_view']['c_date']))
-            sm_date = self.none_to_blank(
-                str(value['result_for_source_view']['sm_date']))
-            url = self.none_to_blank(
-                str(value['result_for_source_view']['url']))
-            url_sha256 = str(hashlib.sha256(
-                url.encode('UTF-8', 'strict')).hexdigest())
-            name_origin = self.none_to_blank(
-                str(value['result_for_source_view']['name']))
-            name = name_origin.encode('UTF-8', 'strict').hex()
-            name_sha256 = str(hashlib.sha256(
-                name_origin.encode('UTF-8', 'strict')).hexdigest())
-            price = self.none_to_blank(
-                str(value['result_for_source_view']['price']))
-            if value['result_for_source_view']['stock'] == 'null' or value['result_for_source_view']['stock'] is None:
-                print_flushed(
-                    "Out ot stock. mpid = {}, url = {}".format(mpid, url))
-                return False
-            stock = self.check_stock(str(value['result_for_source_view']))
-            if stock == '0':
-                print_flushed(
-                    "Out ot stock. mpid = {}, url = {}".format(mpid, url))
-                return False
-            image_url = self.none_to_blank(
-                str(value['result_for_source_view'].get('image_url', '')))
-            num_options = self.none_to_blank(
-                str(value['result_for_source_view']['num_options']))
-            num_images = self.none_to_blank(
-                str(value['result_for_source_view']['num_images']))
-            source_site_product_id = self.none_to_blank(
-                str(value['result_for_source_view']['source_site_product_id']))
-            brand = self.none_to_blank(
-                str(value['result_for_source_view'].get('brand', '')))
-            weight = self.none_to_blank(
-                str(value['result_for_source_view'].get('weight', '')))
-            shipping_weight = self.none_to_blank(
-                str(value['result_for_source_view'].get('shipping_weight', '')))
-            shipping_price = self.none_to_blank(
-                str(value['result_for_source_view'].get('shipping_price', '')))
-            description = self.none_to_blank(
-                str(value['result_for_source_view'].get('description', ''))).encode('UTF-8').hex()
-            description1 = self.none_to_blank(
-                str(value['result_for_source_view'].get('description1', ''))).encode('UTF-8').hex()
-            description2 = self.none_to_blank(
-                str(value['result_for_source_view'].get('description2', ''))).encode('UTF-8').hex()
-            description_rendered = self.none_to_blank(
-                str(value['result_for_source_view'].get('description_rendered', ''))).encode('UTF-8').hex()
-            description1_rendered = self.none_to_blank(
-                str(value['result_for_source_view'].get('description1_rendered', ''))).encode('UTF-8').hex()
-            description2_rendered = self.none_to_blank(
-                str(value['result_for_source_view'].get('description2_rendered', ''))).encode('UTF-8').hex()
+   #         mpid = self.none_to_blank(
+   #             str(value['result_for_source_view']['my_product_id']))
+   #         status = self.none_to_blank(
+   #             str(value['result_for_source_view']['status']))
+   #         c_date = self.none_to_blank(
+   #             str(value['result_for_source_view']['c_date']))
+   #         sm_date = self.none_to_blank(
+   #             str(value['result_for_source_view']['sm_date']))
+   #         url = self.none_to_blank(
+   #             str(value['result_for_source_view']['url']))
+   #         url_sha256 = str(hashlib.sha256(
+   #             url.encode('UTF-8', 'strict')).hexdigest())
+   #         name_origin = self.none_to_blank(
+   #             str(value['result_for_source_view']['name']))
+   #         name = name_origin.encode('UTF-8', 'strict').hex()
+   #         name_sha256 = str(hashlib.sha256(
+   #             name_origin.encode('UTF-8', 'strict')).hexdigest())
+   #         price = self.none_to_blank(
+   #             str(value['result_for_source_view']['price']))
+   #         if value['result_for_source_view']['stock'] == 'null' or value['result_for_source_view']['stock'] is None:
+   #             print_flushed(
+   #                 "Out ot stock. mpid = {}, url = {}".format(mpid, url))
+   #             return False
+   #         stock = self.check_stock(str(value['result_for_source_view']))
+   #         if stock == '0':
+   #             print_flushed(
+   #                 "Out ot stock. mpid = {}, url = {}".format(mpid, url))
+   #             return False
+   #         image_url = self.none_to_blank(
+   #             str(value['result_for_source_view'].get('image_url', '')))
+   #         num_options = self.none_to_blank(
+   #             str(value['result_for_source_view']['num_options']))
+   #         num_images = self.none_to_blank(
+   #             str(value['result_for_source_view']['num_images']))
+   #         source_site_product_id = self.none_to_blank(
+   #             str(value['result_for_source_view']['source_site_product_id']))
+   #         brand = self.none_to_blank(
+   #             str(value['result_for_source_view'].get('brand', '')))
+   #         weight = self.none_to_blank(
+   #             str(value['result_for_source_view'].get('weight', '')))
+   #         shipping_weight = self.none_to_blank(
+   #             str(value['result_for_source_view'].get('shipping_weight', '')))
+   #         shipping_price = self.none_to_blank(
+   #             str(value['result_for_source_view'].get('shipping_price', '')))
+   #         description = self.none_to_blank(
+   #             str(value['result_for_source_view'].get('description', ''))).encode('UTF-8').hex()
+   #         description1 = self.none_to_blank(
+   #             str(value['result_for_source_view'].get('description1', ''))).encode('UTF-8').hex()
+   #         description2 = self.none_to_blank(
+   #             str(value['result_for_source_view'].get('description2', ''))).encode('UTF-8').hex()
+   #         description_rendered = self.none_to_blank(
+   #             str(value['result_for_source_view'].get('description_rendered', ''))).encode('UTF-8').hex()
+   #         description1_rendered = self.none_to_blank(
+   #             str(value['result_for_source_view'].get('description1_rendered', ''))).encode('UTF-8').hex()
+   #         description2_rendered = self.none_to_blank(
+   #             str(value['result_for_source_view'].get('description2_rendered', ''))).encode('UTF-8').hex()
 
+ 
 
+   #         groupbykeys = sorted(groupbykeys)
+   #         groupby_key = ''
+   #         for key in groupbykeys:
+   #             if key not in ['mpid', 'url', 'name', 'price', 'stock', 'brand', 'source_site_product_id', 'brand', 'weight', 'shipping_weight', 'shipping_price', 'description', 'description1', 'description2', 'description_rendered', 'description1_rendered', 'description2_rendered']:
+   #                 groupby_key += str(value['result_for_desc']['value'].get(key, ''))
+   #             else:
+   #                 groupby_key += str(value['result_for_source_view'].get(key,''))
+   #         groupby_key = str(groupby_key)
+   #         groupby_key_sha256 = str(hashlib.sha256(
+   #             groupby_key.encode()).hexdigest())
+   #         self.gp_cur.execute(query, (job_id, mpid, status, c_date, sm_date, url, url_sha256, name, name_sha256, price, stock, image_url, num_options, num_images, groupby_key_sha256, source_site_product_id, brand, weight, shipping_price, shipping_weight, description, description1, description2, description_rendered, description1_rendered, description2_rendered))
+   #         self.gp_conn.commit()
+   #         
 
-            groupbykeys = sorted(groupbykeys)
-            groupby_key = ''
-            for key in groupbykeys:
-                if key not in ['mpid', 'url', 'name', 'price', 'stock', 'brand', 'source_site_product_id', 'brand', 'weight', 'shipping_weight', 'shipping_price', 'description', 'description1', 'description2', 'description_rendered', 'description1_rendered', 'description2_rendered']:
-                    groupby_key += str(value['result_for_desc']['value'].get(key, ''))
-                else:
-                    groupby_key += str(value['result_for_source_view'].get(key,''))
-            groupby_key = str(groupby_key)
-            groupby_key_sha256 = str(hashlib.sha256(
-                groupby_key.encode()).hexdigest())
-            self.gp_cur.execute(query, (job_id, mpid, status, c_date, sm_date, url, url_sha256, name, name_sha256, price, stock, image_url, num_options, num_images, groupby_key_sha256, source_site_product_id, brand, weight, shipping_price, shipping_weight, description, description1, description2, description_rendered, description1_rendered, description2_rendered))
-            self.gp_conn.commit()
-            
-            
-            query = "select id, key_name from mysite_translate_key where job_id = {}".format(job_id);
-            self.gp_cur.execute(query)
-            result = self.gp_cur.fetchall()
-            option_translate = False
-            if result is not None:
-                translate_keys = []
-                for idx, val in enumerate(result):
-                   for idx2, val2 in enumerate(val):
-                      if idx2 == 1:
-                         if is_hex_str(val2) == False:
-                            translate_keys.append(val2)
-                         else:
-                            translate_keys.append(bytes.fromhex(val2).decode())
-                if len(translate_keys) != 0:
-                    translator = Translator()
-                    if val != 'option':
-                        for idx, val in translate_keys:
-                            translated_text = ''
-                            try:
-                                translated_text = translator.translate(value['result_for_source_view'][val], src='ja', dest="ko").text
-                            except:
-                                pass
-                            if translated_text != '':
-                                query = 'update job_soure_view set {}_translated = {} where job_id = {} and mpid = {}; COMMIT;'.format(val, translated_text, job_id, mpid)
-                                self.gp_cur.execute(query)
-                                self.gp_conn.commit()
-                    else:
-                        option_translate = True
+   #         query = "select id, key_name from mysite_translate_key where job_id = {}".format(job_id);
+   #         self.gp_cur.execute(query)
+   #         result = self.gp_cur.fetchall()
+   #         option_translate = False
+   #         if result is not None:
+   #             translate_keys = []
+   #             for idx, val in enumerate(result):
+   #                for idx2, val2 in enumerate(val):
+   #                   if idx2 == 1:
+   #                      if is_hex_str(val2) == False:
+   #                         translate_keys.append(val2)
+   #                      else:
+   #                         translate_keys.append(bytes.fromhex(val2).decode())
+   #             if len(translate_keys) != 0:
+   #                 translator = Translator()
+   #                 if val != 'option':
+   #                     for idx, val in translate_keys:
+   #                         translated_text = ''
+   #                         try:
+   #                             translated_text = translator.translate(value['result_for_source_view'][val], src='ja', dest="ko").text
+   #                         except:
+   #                             pass
+   #                         if translated_text != '':
+   #                             query = 'update job_soure_view set {}_translated = {} where job_id = {} and mpid = {}; COMMIT;'.format(val, translated_text, job_id, mpid)
+   #                             self.gp_cur.execute(query)
+   #                             self.gp_conn.commit()
+   #                 else:
+   #                     option_translate = True
 
-            # insert data to description_source_view
-            # (job_id integer, mpid integer, key varchar(2048), value text)
-            query = 'INSERT INTO job_description_source_view (job_id, mpid, key, value) '
-            query += 'VALUES (%s, %s, %s, %s)'
-            mpid = int(value['result_for_desc']['my_product_id'])
-            for key in value['result_for_desc']['key']:
-                if key == 'description':
-                    attr = self.none_to_blank(
-                        str(value['result_for_desc']['value'][key]))
-                    self.gp_cur.execute(query, (job_id, str(mpid), 'description_sha256', str(
-                        hashlib.sha256(attr.encode()).hexdigest())))
-                attr = str(value['result_for_desc']['value'][key])
-                attr = attr.encode('UTF-8').hex()
-                self.gp_cur.execute(query, (job_id, mpid, key, attr))
-            self.gp_conn.commit()
+   #         # insert data to description_source_view
+   #         # (job_id integer, mpid integer, key varchar(2048), value text)
+   #         query = 'INSERT INTO job_description_source_view (job_id, mpid, key, value) '
+   #         query += 'VALUES (%s, %s, %s, %s)'
+   #         mpid = int(value['result_for_desc']['my_product_id'])
+   #         for key in value['result_for_desc']['key']:
+   #             if key == 'description':
+   #                 attr = self.none_to_blank(
+   #                     str(value['result_for_desc']['value'][key]))
+   #                 self.gp_cur.execute(query, (job_id, str(mpid), 'description_sha256', str(
+   #                     hashlib.sha256(attr.encode()).hexdigest())))
+   #             attr = str(value['result_for_desc']['value'][key])
+   #             attr = attr.encode('UTF-8').hex()
+   #             self.gp_cur.execute(query, (job_id, mpid, key, attr))
+   #         self.gp_conn.commit()
 
-            # insert data to option_source_view
-            # (job_id integer, mpid integer, option_name varchar(2048), option_value varchar(2048), list_price varchar(64), price varchar(64), stock integer, stock_status integer, msg varchar(2048))
-            query = 'INSERT INTO job_option_source_view (job_id, mpid, option_name, option_value, list_price, price, stock, stock_status, msg, option_name_translated, option_value_translated) '
-            query += 'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
-            mpid = str(value['result_for_option']['my_product_id'])
-            for option_name in value['result_for_option']['option_names']:
-                option_name_translated = ''
-                if option_translate == True:
-                    try:
-                        option_name_translated = translator.translate(option_name, src='ja', dest="ko").text
-                    except:
-                        pass
-                for option_val in value['result_for_option']['option_values'][option_name]:
-                    list_price = self.none_to_blank(
-                        str(value['result_for_option']['list_price']))
-                    price = self.none_to_blank(
-                        str(value['result_for_option']['price']))
-                    stock = self.check_stock(value['result_for_option'])
-                    stock_status = self.none_to_blank(
-                        str(value['result_for_option']['stock_status']))
-                    msg = self.none_to_blank(
-                        str(value['result_for_option']['msg']))
-                    option_val_translated = ''
-                    if option_translate == True:
-                        try:
-                            option_val_translated = translator.translate(option_val, src='ja', dest="ko").text
-                        except:
-                            pass
-                    #self.gp_cur.execute(query, (job_id, mpid, str((option_name.encode().hexdigest())), str((option_val.encode('UTF-8').hexdigest())), list_price, price, stock, stock_status, msg))
-                    self.gp_cur.execute(query, (job_id, mpid, option_name.encode().hex(
-                    ), option_val.encode('UTF-8').hex(), list_price, price, stock, stock_status, msg, option_name_translated.encode('UTF-8').hex(), option_val_translated.encode('UTF-8').hex()))
-            self.gp_conn.commit()
+   #         # insert data to option_source_view
+   #         # (job_id integer, mpid integer, option_name varchar(2048), option_value varchar(2048), list_price varchar(64), price varchar(64), stock integer, stock_status integer, msg varchar(2048))
+   #         query = 'INSERT INTO job_option_source_view (job_id, mpid, option_name, option_value, list_price, price, stock, stock_status, msg, option_name_translated, option_value_translated) '
+   #         query += 'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
+   #         mpid = str(value['result_for_option']['my_product_id'])
+   #         for option_name in value['result_for_option']['option_names']:
+   #             option_name_translated = ''
+   #             if option_translate == True:
+   #                 try:
+   #                     option_name_translated = translator.translate(option_name, src='ja', dest="ko").text
+   #                 except:
+   #                     pass
+   #             for option_val in value['result_for_option']['option_values'][option_name]:
+   #                 list_price = self.none_to_blank(
+   #                     str(value['result_for_option']['list_price']))
+   #                 price = self.none_to_blank(
+   #                     str(value['result_for_option']['price']))
+   #                 stock = self.check_stock(value['result_for_option'])
+   #                 stock_status = self.none_to_blank(
+   #                     str(value['result_for_option']['stock_status']))
+   #                 msg = self.none_to_blank(
+   #                     str(value['result_for_option']['msg']))
+   #                 option_val_translated = ''
+   #                 if option_translate == True:
+   #                     try:
+   #                         option_val_translated = translator.translate(option_val, src='ja', dest="ko").text
+   #                     except:
+   #                         pass
+   #                 #self.gp_cur.execute(query, (job_id, mpid, str((option_name.encode().hexdigest())), str((option_val.encode('UTF-8').hexdigest())), list_price, price, stock, stock_status, msg))
+   #                 self.gp_cur.execute(query, (job_id, mpid, option_name.encode().hex(
+   #                 ), option_val.encode('UTF-8').hex(), list_price, price, stock, stock_status, msg, option_name_translated.encode('UTF-8').hex(), option_val_translated.encode('UTF-8').hex()))
+   #         self.gp_conn.commit()
 
-            # insert data to thumbnail_source_view
-            # (job_id integer, mpid integer, image_url varchar(2048), image_url_sha256 varchar(64))
-            query = 'INSERT INTO job_thumbnail_source_view (job_id, mpid, image_url, image_url_sha256)'
-            query += 'VALUES (%s, %s, %s, %s)'
-            mpid = str(value['result_for_option']['my_product_id'])
-            for img_url in value['result_for_thumbnail']['image_urls']:
-                self.gp_cur.execute(query, (job_id, mpid, str(img_url), str(
-                    hashlib.sha256(img_url.encode()).hexdigest())))
-            self.gp_conn.commit()
-
-                    
-
-        except:
-            self.gp_conn.rollback()
-            raise
+   #         # insert data to thumbnail_source_view
+   #         # (job_id integer, mpid integer, image_url varchar(2048), image_url_sha256 varchar(64))
+   #         query = 'INSERT INTO job_thumbnail_source_view (job_id, mpid, image_url, image_url_sha256)'
+   #         query += 'VALUES (%s, %s, %s, %s)'
+   #         mpid = str(value['result_for_option']['my_product_id'])
+   #         for img_url in value['result_for_thumbnail']['image_urls']:
+   #             self.gp_cur.execute(query, (job_id, mpid, str(img_url), str(
+   #                 hashlib.sha256(img_url.encode()).hexdigest())))
+   #         self.gp_conn.commit()
 
 
     def get_mpid_from_mysite_without_up_to_date(self, exec_id, max_items):
@@ -1208,30 +1652,26 @@ class GraphManager():
             values = values[0:-2]
 
             query = 'select '+values + \
-                ' from job_source_view where mpid = {} and job_id = {}'.format(
-                    mpid, job_id)
+                ' from job_source_view where mpid = {}'.format(mpid)
             self.gp_cur.execute(query)
             col_values = self.gp_cur.fetchall()
             col_values = col_values[0]
 
             result = {}
             for i in range(0, len(col_names)):
-                if col_names[i] == 'name':
-                    result[col_names[i]] = bytes.fromhex(
-                        col_values[i]).decode()
-                else:
-                    result[col_names[i]] = col_values[i]
+                #if col_names[i] == 'name':
+                #    result[col_names[i]] = bytes.fromhex(col_values[i]).decode()
+                #else:
+                result[col_names[i]] = col_values[i]
 
-            query = 'select image_url from job_thumbnail_source_view where mpid = {} and job_id = {}'.format(
-                mpid, job_id)
+            query = 'select image_url from job_thumbnail_source_view where mpid = {}'.format(mpid)
             self.gp_cur.execute(query)
             rows = self.gp_cur.fetchall()
             result['images'] = []
             for row in rows:
                 result['images'].append(row[0])
 
-            query = 'select key, value from job_description_source_view where mpid = {} and job_id = {}'.format(
-                mpid, job_id)
+            query = 'select key, value from job_description_source_view where mpid = {}'.format(mpid)
             self.gp_cur.execute(query)
             rows = self.pg_cur.fetchall()
 
@@ -1244,8 +1684,7 @@ class GraphManager():
             #col_names = self.gp_cur.fetchall()
             # self.gp_conn.commit()
 
-            query = 'select option_name, option_value, stock from job_option_source_view where mpid = {} and job_id = {}'.format(
-                mpid, job_id)
+            query = 'select option_name, option_value, stock from job_option_source_view where mpid = {}'.format(mpid)
             self.gp_cur.execute(query)
             rows = self.gp_cur.fetchall()
             self.gp_conn.commit()
@@ -2667,6 +3106,23 @@ class GraphManager():
             print_flushed(query)
             print_flushed(str(traceback.format_exc()))
             raise e
+
+
+    def get_mysite_column_name(self):
+        try:
+            query = "select column_name from information_schema.columns where table_name = 'job_source_view' order by column_name"
+            self.gp_cur.execute(query)
+            result = self.gp_cur.fetchall()
+            col_names = []
+            for i in result:
+                col_names.append(i[0])
+
+            return { "success": True, "result" : col_names }
+        except:
+            conn.rollback()
+            return { "success": False }
+
+
 
     # for jomashop
 
