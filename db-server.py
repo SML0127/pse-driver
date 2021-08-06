@@ -2380,7 +2380,7 @@ class ProductListManager(Resource):
     def get_product_description(self, job_id, mpid):
         try:
             cur = conn.cursor()
-            query = "select key, value from job_description_source_view where job_id = {} and mpid = {};".format(job_id, mpid)
+            query = "select key, value from job_description_source_view where mpid = {};".format(mpid)
             cur.execute(query)
             result = cur.fetchall()
             for idx, val in enumerate(result):
@@ -2404,7 +2404,7 @@ class ProductListManager(Resource):
             if statu == -1:
                query = "select mpid, name, url, price, shipping_price, brand, weight, shipping_weight, shipping_price1, source_site_product_id, status, image_url, currency, stock, num_options, num_images from job_source_view where mpid in (select mpid from job_id_and_mpid where job_id = {}) and status != 4".format(job_id)
             else:
-               query = "select mpid, name, url, price, shipping_price, brand, weight, shipping_weight, shipping_price1, source_site_product_id, status, image_url, currency, stock, num_options, num_images from job_source_view where mpid in (select mpid from job_id_and_mpid where job_id = {})  and status = {};".format(job_id, statu)
+               query = "select mpid, name, url, price, shipping_price, brand, weight, shipping_weight, shipping_price1, source_site_product_id, status, image_url, currency, stock, num_options, num_images from job_source_view where mpid in (select mpid from job_id_and_mpid where job_id = {}) and status = {};".format(job_id, statu)
             cur.execute(query)
             result = cur.fetchall()
             if len(result) == 0:
@@ -2744,7 +2744,7 @@ class ProductOptionsManager(Resource):
     def get_product_options(self, user_id, job_id, pid):
         try:
             cur = conn.cursor()
-            query = "select * from job_option_source_view where mpid = {} and job_id = {} and (option_name != '6f7074696f6e5f6d6178747269785f76616c7565' and option_name != '6f7074696f6e5f6d61747269785f636f6c5f6e616d65' and option_name != '6f7074696f6e5f6d61747269785f726f775f6e616d65');".format(pid, job_id)
+            query = "select * from job_option_source_view where mpid = {} and (option_name != '6f7074696f6e5f6d6178747269785f76616c7565' and option_name != '6f7074696f6e5f6d61747269785f636f6c5f6e616d65' and option_name != '6f7074696f6e5f6d61747269785f726f775f6e616d65');".format(pid)
             cur.execute(query)
             result = cur.fetchall()
             for idx, val in enumerate(result):

@@ -177,9 +177,10 @@ class Cafe24Driver():
       #exec_id = -1
       #label = self.graph_manager.get_max_label_from_eid(exec_id)
       max_items = self.graph_manager.get_max_items_from_tsid(tsid)
-      #mpids = self.graph_manager.get_mpid_from_mysite_without_up_to_date(exec_id, max_items)
-
+      #mpids = self.graph_manager.get_mpid_from_mysite_without_up_to_date(job_id, max_items)
       mpids = self.graph_manager.get_mpid_from_mysite(job_id, max_items)
+
+      #mpids = self.graph_manager.get_mpid_from_mysite(job_id, max_items)
       #mpids = [1364, 1368, 262004]
       targs = {}
       targs = json.loads(self.graph_manager.get_selected_gateway_configuration_program_onetime(tsid))
@@ -214,7 +215,8 @@ class Cafe24Driver():
     exec_id = self.graph_manager.get_latest_eid_from_job_id(job_id)
     #label = self.graph_manager.get_max_label_from_eid(exec_id)
     max_items = self.graph_manager.get_max_items_from_tsid(tsid)
-    mpids = self.graph_manager.get_mpid_from_mysite_without_up_to_date(exec_id, max_items)
+    #mpids = self.graph_manager.get_mpid_from_mysite_without_up_to_date(job_id, max_items)
+    mpids = self.graph_manager.get_mpid_from_mysite(job_id, max_items)
 
     targs = json.loads(self.graph_manager.get_selected_gateway_configuration_program_onetime(tsid))
     targs.update(args)
@@ -245,7 +247,8 @@ class Cafe24Driver():
     start_time = time.time()
     tsid = args['target_id']
     max_items = self.graph_manager.get_max_items_from_tsid(tsid)
-    mpids = self.graph_manager.get_mpid_from_mysite_without_up_to_date(exec_id, max_items)
+    #mpids = self.graph_manager.get_mpid_from_mysite_without_up_to_date(args['job_id'], max_items)
+    mpids = self.graph_manager.get_mpid_from_mysite(args['job_id'], max_items)
     job_id = self.graph_manager.get_job_id_from_eid(exec_id)
     utcnow = datetime.utcnow()
     time_gap = timedelta(hours=9)

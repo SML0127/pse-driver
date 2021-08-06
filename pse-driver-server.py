@@ -128,8 +128,6 @@ class DriverManager(Resource):
         print_flushed(job_id)
         try:
             print_flushed("Upload / Update to target site")
-            #for i in target_ids:
-            #   target_id = i
             command_str = 'python cafe24_driver.py --cafe24_c run_onetime_from_ui --job_id {} --cafe24_host 127.0.0.1 --cafe24_port 6379 --cafe24_queue cafe24_queue'.format(job_id)
             print_flushed(command_str)
             subprocess.Popen(command_str, shell=True)
