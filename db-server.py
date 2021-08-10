@@ -2636,6 +2636,46 @@ class ProductListManager(Resource):
             print (str(traceback.format_exc()))
             return { "success": False }
 
+    def get_crawled_dataOLD(self, job_id):
+        try:
+            #query = "select t4.my_product_id, t1.id from node as t1, (select id, status from task where stage_id in (select max(id) from stage where execution_id in (select id from execution where job_id = {}) group by execution_id)) as t2, node_property as t3, url_to_mpid t4 where t1.task_id = t2.id and t3.node_id = t1.id and t3.key = 'url' and  concat(\'\"\',t4.url,\'\"\') = t3.value::text order by t1.id asc".format(job_id)
+            query = "select distinct id from node where task_id in (select distinct id from task where stage_id in (select max(id) from stage where execution_id in (select id from execution where job_id = {}) group by execution_id))".format(job_id)
+            cur = conn.cursor()
+            cur.execute(query)
+            results = cur.fetchall() # [[mpid, node_id], []]
+            print(len(results))
+            query = "select my_product_id, url from url_to_mpid where concat(\'\"\',url,\'\"\') in (select distinct value::text from node_property where node_id in (select id from node where task_id in (select id from task where stage_id in (select max(id) from stage where execution_id in (select id from execution where job_id = {}) group by execution_id))) and key = 'url')".format(job_id)
+            cur = conn.cursor()
+            cur.execute(query)
+            results = cur.fetchall() # [[mpid, node_id], []]
+            print(len(results))
+            query = "select t2.status, t3.value::text, t1.id from node as t1, (select id, status from task where stage_id in (select max(id) from stage where execution_id in (select id from execution where job_id = {}) group by execution_id)) as t2, node_property as t3 where t1.task_id = t2.id and t3.node_id = t1.id and t3.key = 'name' order by t1.id asc".format(job_id)
+            cur = conn.cursor()
+            cur.execute(query)
+            results = cur.fetchall() #[[status, name, node_id],[]]
+            print(len(results))
+       
+            return { "success": True, "result": results }
+        except:
+            conn.rollback()
+            print (str(traceback.format_exc()))
+            return { "success": False }
+
+    def get_crawled_data(self, execution_id):
+        try:
+            query = "select t2.status, t3.value::text, t1.id from node as t1, (select id, status from task where stage_id in (select max(id) from stage where execution_id = {})) as t2, node_property as t3 where t1.task_id = t2.id and t3.node_id = t1.id and t3.key = 'name' order by t1.id asc".format(execution_id)
+            cur = conn.cursor()
+            cur.execute(query)
+            results = cur.fetchall() #[[status, name, node_id],[]]
+            print(len(results))
+       
+ 
+            return { "success": True, "result": results }
+        except:
+            conn.rollback()
+            print (str(traceback.format_exc()))
+            return { "success": False }
+
     def get_crawled_time(self, job_id, url):
         try:
             query = "select node_id from node_property where node_id in (select id from node where task_id in (select id from task where stage_id in (select max(id) from stage where execution_id in (select id from execution where job_id = {}) group by execution_id))) and key = 'url' and value::text='\"{}\"' order by node_id desc;".format(job_id, url)
@@ -2688,7 +2728,8 @@ class ProductListManager(Resource):
 
     def get_product_detail(self, node_id):
         try:
-            query = "select key, value from node_property where node_id = {}".format(node_id)
+            query = "select key, value from node_property where node_id = {} and key != 'html'".format(node_id)
+            print(query)
             cur = conn.cursor()
             cur.execute(query)
             result = cur.fetchall()
@@ -2713,7 +2754,9 @@ class ProductListManager(Resource):
         parser.add_argument('targetsite')
         parser.add_argument('upload_time')
         parser.add_argument('node_id')
+        parser.add_argument('execution_id')
         args = parser.parse_args()
+        print(args)
         if args['req_type'] == 'get_product_list':
             return self.get_product_list(args['user_id'], args['job_id'],args['statu']);
         elif args['req_type'] == 'get_product_history':
@@ -2734,6 +2777,8 @@ class ProductListManager(Resource):
             return self.delete_product(args['user_id'], args['time']);
         elif args['req_type'] == 'get_crawled_data_history':
             return self.get_crawled_data_history(args['job_id']);
+        elif args['req_type'] == 'get_crawled_data':
+            return self.get_crawled_data(args['execution_id']);
         elif args['req_type'] == 'get_crawled_time':
             return self.get_crawled_time(args['job_id'], args['url']);
         elif args['req_type'] == 'get_product_detail':

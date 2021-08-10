@@ -2656,14 +2656,8 @@ class GraphManager():
             print_flushed(str(traceback.format_exc()))
             raise
 
-    def get_selected_transformation_programOld(self, job_id):
+    def get_ransformation_program(self, tpid):
         try:
-            query = "select transformation_program_id  from job_configuration where job_id = {}".format(
-                job_id)
-            self.gp_cur.execute(query)
-            result = self.gp_cur.fetchone()
-            tpid = result[0]
-
             query = "select transformation_program from transformation_program where id = {}".format(
                 tpid)
             self.gp_cur.execute(query)

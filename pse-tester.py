@@ -1,6 +1,6 @@
 from engine.operators import *
 from managers.graph_manager import *
-from managers.web_manager import *
+#from managers.web_manager import *
 from managers.redis_manager import *
 from rq import Queue, Worker
 import subprocess
@@ -35,35 +35,12 @@ if __name__ == '__main__':
     gvar = GlovalVariable()
     gvar.graph_mgr = GraphManager()
     gvar.graph_mgr.connect(
-        "host=141.223.197.35 port=54320 user=pse password=pse dbname=pse")
+        "host=141.223.197.42 port=54320 user=pse password=pse dbname=pse")
     try:
         #tmp = gvar.graph_mgr.get_node_properties_from_mysite_for_update(317, 679)
-        tmp = gvar.graph_mgr.get_options()
-        for op_v in tmp:
-            print('------------------------------------------------------------------------')
-            print('-------------------')
-            print('option value : \t\t\t', op_v)
-            print('-------------------')
-            start1 =0
-            end1 = op_v.find('\n')
-            if end1 == -1:
-               option_size = op_v
-            else:
-               option_size = op_v[start1:end1]
-            additional_price = '0'
-            additional_stock = '999'
-            if re.findall( r'([0-9]*\,?\.?[0-9,'']*.€)', op_v):
-               additional_price = re.findall( r'([0-9]*\,?\.?[0-9,.]*.€)', op_v)[0]
-            if re.findall( r'(Notify Me)', op_v):
-               additional_stock = '0'
-            if re.findall( r'(Only [0-9]* left)', op_v):
-               additional_stock = int(Price.fromstring(re.findall( r'(Only [0-9]* left)', op_v)[0]).amount_float)
-            print('smlee option_size: \t\t\t\t', option_size)
-            print('smlee regex additional price: \t\t\t', additional_price)
-            print('smlee regex & price parser additional price: \t', Price.fromstring(additional_price))
-            print('smlee regex Notify Me: \t\t\t\t', additional_stock)
-            print('smlee regex Only ? Left: \t\t\t', additional_stock)
-            
+        tmp = gvar.graph_mgr.get_ransformation_program(50)
+        print(tmp)
+
            
     except Exception as e:
         # print(e)

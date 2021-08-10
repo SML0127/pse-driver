@@ -5,3 +5,4 @@ cli*
 *.swp
 *.sql
 tmp*
+pse-tester*
