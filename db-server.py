@@ -21,6 +21,7 @@ from datetime import datetime
 from datetime import timedelta
 import requests
 import string
+from price_parser import Price
 
 #from pse_driver import *
 
@@ -424,6 +425,20 @@ class TaskManager(Resource):
             conn.rollback()
             print(str(traceback.format_exc()))
             return { "success": False, "traceback": str(traceback.format_exc()) }       
+
+
+    def get_failed_task_detail(self, node_id):
+        try:
+            cur = conn.cursor()
+            query = "select err_msg from failed_task_detail where task_id in (select task_id from node where id = {});".format(node_id)
+            cur.execute(query)
+            results = cur.fetchone()[0]
+            return {"success" : True, "result" : results}
+        except:
+            conn.rollback()
+            print(str(traceback.format_exc()))
+            return { "success": False, "traceback": str(traceback.format_exc()) }       
+    
     
     def get_succeed_task(self, task_id, tables):
         try:
@@ -569,6 +584,7 @@ class TaskManager(Resource):
         parser.add_argument('task_ids')
         parser.add_argument('tables')
         parser.add_argument('exec_id')
+        parser.add_argument('node_id')
         args = parser.parse_args()
         if args['req_type'] == 'stages':
             return self.get_stages(args['execution_id'], args['num_of_stages'])
@@ -580,6 +596,8 @@ class TaskManager(Resource):
             return self.get_succeed_task(args['task_id'], args['tables'])
         if args['req_type'] == 'failed_task':
             return self.get_failed_task(args['exec_id'])
+        if args['req_type'] == 'get_failed_task_detail':
+            return self.get_failed_task_detail(args['node_id'])
         if args['req_type'] == 'input_of_tasks':
             return self.get_input_of_tasks(args['task_ids'])
         return { "success": False }
@@ -889,7 +907,7 @@ class ExecutionsManager(Resource):
                     conn.commit()
 
 
-                    query = 'select count(*) from task where stage_id in (select max(id) from stage where execution_id = {}) and status = -1'.format(exec_id)
+                    query = 'select count(*) from task where stage_id in (select max(id) from stage where execution_id = {}) and (status = -1 or status = -997)'.format(exec_id)
                     #query = 'select count(id) from task where stage_id = {} and status = 1'.format(stage_id)
                     cur.execute(query)
                     res= cur.fetchone()
@@ -950,7 +968,7 @@ class ExecutionsManager(Resource):
                     conn.commit()
 
 
-                    query = 'select count(*) from task where stage_id in (select max(id) from stage where execution_id = {}) and status = -1'.format(exec_id)
+                    query = 'select count(*) from task where stage_id in (select max(id) from stage where execution_id = {}) and (status = -1 or status = -997)'.format(exec_id)
                     #query = 'select count(id) from task where stage_id = {} and status = 1'.format(stage_id)
                     cur.execute(query)
                     res= cur.fetchone()
@@ -2661,20 +2679,86 @@ class ProductListManager(Resource):
             print (str(traceback.format_exc()))
             return { "success": False }
 
-    def get_crawled_data(self, execution_id):
+    def get_crawled_data(self, job_id):
         try:
-            query = "select t2.status, t3.value::text, t1.id from node as t1, (select id, status from task where stage_id in (select max(id) from stage where execution_id = {})) as t2, node_property as t3 where t1.task_id = t2.id and t3.node_id = t1.id and t3.key = 'name' order by t1.id asc".format(execution_id)
             cur = conn.cursor()
+
+            query = "select max(id) from execution where job_id = {}".format(job_id)
+            cur.execute(query)
+            execution_id = cur.fetchone()[0] # [[mpid], []]
+
+            query = "select value::text, max(node_id) from node_property where node_id in (select id from node where task_id in (select id from task where stage_id in (select max(id) from stage where execution_id = {}))) and key = 'url' group by value::text".format(execution_id)
+            cur.execute(query)
+            results = cur.fetchall() # [[mpid], []]
+            node_ids = '('
+            for res in results:
+                node_ids = node_ids + str(res[1]) + ', '
+            node_ids = node_ids[0:-2] + ')'
+
+            #query = "select t2.status, t3.value::text, t1.id from node as t1, (select id, status from task where stage_id in (select max(id) from stage where execution_id = {})) as t2, node_property as t3 where t1.task_id = t2.id and t3.node_id in {} and t3.node_id = t1.id and t3.key = 'name' and t2.status = 1 order by t1.id asc".format(execution_id, node_ids)
+            query = "select t3.value::text, t1.id from node as t1, (select id, status from task where stage_id in (select max(id) from stage where execution_id = {})) as t2, node_property as t3 where t1.task_id = t2.id and t3.node_id in {} and t3.node_id = t1.id and t3.key = 'name' and t2.status = 1 order by t1.id asc".format(execution_id, node_ids)
             cur.execute(query)
             results = cur.fetchall() #[[status, name, node_id],[]]
-            print(len(results))
-       
- 
-            return { "success": True, "result": results }
+            results_dictionary = {}
+            for res in results:
+                node_id = res[1]
+                results_dictionary[node_id] = {'status': 1, 'name': res[0]} 
+
+            query = "select t1.status, t2.id from task as t1, node as t2 where t1.id = t2.task_id and t2.id in {}".format(node_ids)
+            cur.execute(query)
+            results0 = cur.fetchall() #[[status, name, node_id],[]]
+            print(results0)
+            for res in results0:
+                node_id = res[1]
+                if node_id in results_dictionary: 
+                    results_dictionary[node_id]['status'] = res[0]
+                else:
+                    results_dictionary[node_id] = {'status': res[0], 'name': '"-"'}
+         
+
+            query = "select my_product_id, t2.node_id from url_to_mpid as t1, (select distinct value::text as url, node_id from node_property where node_id in {} and key = 'url') as t2 where concat(\'\"\',t1.url,\'\"\') = t2.url order by my_product_id asc".format(node_ids)
+            cur.execute(query)
+            results1 = cur.fetchall() # [[mpid], []]
+            new_results = [] 
+            for res in results1:
+                mpid = res[0]
+                node_id = res[1]
+                status = results_dictionary.get(node_id, {'status': -1})['status']
+                name = results_dictionary.get(node_id, {'name':'"-"'})['name']
+                name = name.encode('ascii').decode('unicode_escape')
+                if status == -997:
+                    name = '"-"'
+                new_results.append([status, name, node_id, mpid])
+            return { "success": True, "result": new_results }
         except:
             conn.rollback()
             print (str(traceback.format_exc()))
             return { "success": False }
+
+    def get_product_detail(self, node_id):
+        try:
+            query = "select key, value from node_property where node_id = {} and key != 'html'".format(node_id)
+            cur = conn.cursor()
+            cur.execute(query)
+            result = cur.fetchall()
+            currency = ''
+            for idx, val in enumerate(result):
+                if val[0] == 'price':
+                    lst = list(result[idx])
+                    lst[1] = Price.fromstring(val[1]).amount_float;
+                    currency = Price.fromstring(val[1]).currency
+                    t = tuple(lst)
+                    result[idx] = t
+
+            result.append(('currency', currency))
+            return { "success": True, "result": result }
+        except:
+            conn.rollback()
+            print (str(traceback.format_exc()))
+            return { "success": False }
+
+
+
 
     def get_crawled_time(self, job_id, url):
         try:
@@ -2726,20 +2810,6 @@ class ProductListManager(Resource):
             return { "success": False }
 
 
-    def get_product_detail(self, node_id):
-        try:
-            query = "select key, value from node_property where node_id = {} and key != 'html'".format(node_id)
-            print(query)
-            cur = conn.cursor()
-            cur.execute(query)
-            result = cur.fetchall()
-            return { "success": True, "result": result }
-        except:
-            conn.rollback()
-            print (str(traceback.format_exc()))
-            return { "success": False }
-
-
 
 
     def post(self):
@@ -2778,7 +2848,7 @@ class ProductListManager(Resource):
         elif args['req_type'] == 'get_crawled_data_history':
             return self.get_crawled_data_history(args['job_id']);
         elif args['req_type'] == 'get_crawled_data':
-            return self.get_crawled_data(args['execution_id']);
+            return self.get_crawled_data(args['job_id']);
         elif args['req_type'] == 'get_crawled_time':
             return self.get_crawled_time(args['job_id'], args['url']);
         elif args['req_type'] == 'get_product_detail':
