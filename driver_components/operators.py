@@ -154,12 +154,17 @@ class BFSIterator():
     cur_time = datetime.utcnow() + time_gap 
     cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
     graph_manager.add_is_error(job_id)
+    url_cnt = 0
+    for (parent_task_id, parent_node_id, urls) in results.get(input_op_id, []):
+      url_cnt = url_cnt + len(urls)
+    if max_num_tasks != -1 and max_num_tasks < url_cnt:
+      url_cnt = max_num_tasks
+    graph_manager.re_log_to_job_current_crawling_working('{}\n[Running] Crawled 0 items (# of expected items = {})'.format(cur_time, url_cnt), job_id) 
     for (parent_task_id, parent_node_id, urls) in results.get(input_op_id, []):
       if max_num_tasks > -1 and num_tasks >= max_num_tasks: break
       task['parent_task_id'] = parent_task_id
       task['parent_node_id'] = parent_node_id
       num_local_tasks = 0
-      graph_manager.re_log_to_job_current_crawling_working('{}\n[Running] Crawled 0 items (# of expected items = {})'.format(cur_time, len(urls)), job_id) 
       for url in urls:
         if max_num_tasks > -1 and num_tasks >= max_num_tasks:
           break
