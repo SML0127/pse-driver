@@ -99,9 +99,10 @@ class BFSIterator():
     return len(successful_tasks), len(failed_tasks)
 
 
-  def wait_detail_pagination(self, rm, running_tasks, results, graph_manager, job_id):
+  def wait_detail_pagination(self, rm, running_tasks, results, graph_manager, job_id, exec_id):
     try:
       successful_tasks, failed_tasks = [], []
+      prev_cnt = 0
       while len(running_tasks) > 0:
         indexes = []
         for idx, task in enumerate(running_tasks):
@@ -118,6 +119,9 @@ class BFSIterator():
         for val in sorted(indexes, reverse = True):
           running_tasks.pop(val)
         print_flushed("### STAGE {} - SUCCESSFUL: {}, FAILED: {}, RUNNING: {} ".format(self.props['id'], len(successful_tasks), len(failed_tasks), len(running_tasks)))
+        cnt = len(successful_tasks) + len(failed_tasks) - prev_cnt
+        graph_manager.log_expected_num_detail_success(exec_id, cnt) 
+        prev_cnt = len(successful_tasks) + len(failed_tasks)  
         time.sleep(10)
 
       for stask in successful_tasks:
@@ -147,6 +151,7 @@ class BFSIterator():
     task = self.props
     running_tasks, num_tasks = [], 0
     input_op_id = task['input']
+    exec_id = task['execution_id']
     chunk_size, max_chunk_size = 0, self.props.get('max_num_worker', 100)
     total_num_s = 0
     
@@ -159,6 +164,7 @@ class BFSIterator():
       url_cnt = url_cnt + len(urls)
     if max_num_tasks != -1 and max_num_tasks < url_cnt:
       url_cnt = max_num_tasks
+    graph_manager.log_expected_num_detail(exec_id, url_cnt) 
     graph_manager.re_log_to_job_current_crawling_working('{}\n[Running] Crawled 0 items (# of expected items = {})'.format(cur_time, url_cnt), job_id) 
     for (parent_task_id, parent_node_id, urls) in results.get(input_op_id, []):
       if max_num_tasks > -1 and num_tasks >= max_num_tasks: break
@@ -177,13 +183,13 @@ class BFSIterator():
         chunk_size += 1
         if chunk_size == max_chunk_size:
           chunk_size = 0
-          num_s, num_f = self.wait_detail_pagination(rm, running_tasks, results, graph_manager, job_id)
+          num_s, num_f = self.wait_detail_pagination(rm, running_tasks, results, graph_manager, job_id, exec_id)
           total_num_s += num_s
           cur_time = datetime.utcnow() + time_gap 
           cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
           graph_manager.log_to_job_current_crawling_working('\n{}\n[Running] Crawled {} items'.format(cur_time, total_num_s), job_id) 
     if task['input'] in results: del results[task['input']]
-    num_s, num_f = self.wait_detail_pagination(rm, running_tasks, results, graph_manager, job_id)
+    num_s, num_f = self.wait_detail_pagination(rm, running_tasks, results, graph_manager, job_id, exec_id)
     total_num_s += num_s
     cur_time = datetime.utcnow() + time_gap 
     cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
