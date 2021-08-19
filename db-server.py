@@ -1173,7 +1173,6 @@ class ExecutionsManager(Resource):
             cur = conn.cursor()
             cur.execute(query)
             result = cur.fetchone()
-            print(result)
             return { "success": True, "result": result }
         except:
             conn.rollback()
@@ -1738,6 +1737,20 @@ class TargetSiteManager(Resource): # added by mwseo
             conn.rollback()
             return { "success": False }
 
+    def get_latest_progress(self, job_id):
+        try:
+            cur = conn.cursor()
+            query = "select num_expected_all, num_expected_success from mt_history where job_id = {} order by id desc limit 1".format(job_id)
+            cur.execute(query)
+            result = cur.fetchone()
+            conn.commit()
+            return { "success": True, "result": result}
+        except:
+            conn.rollback()
+            return { "success": False }
+
+
+
 
     def post(self):
         parser = reqparse.RequestParser()
@@ -1762,6 +1775,8 @@ class TargetSiteManager(Resource): # added by mwseo
             return self.get_err_msg(args['mt_history_id'])
         elif args['req_type'] == 'get_history':
             return self.get_history(args['job_id'])
+        elif args['req_type'] == 'get_latest_progress':
+            return self.get_latest_progress(args['job_id'])
 
 class DeliveryManager(Resource): # added by mwseo
     def get_delivery_companies(self, user_id):
@@ -3145,10 +3160,25 @@ class MySiteManager(Resource):
             cur.execute(query)
             result = cur.fetchall()
             conn.commit()
+            print(result)
             return { "success": True, "result": result}
         except:
             conn.rollback()
             return { "success": False }
+
+    def get_latest_progress(self, job_id):
+        try:
+            cur = conn.cursor()
+            query = "select num_expected_all, num_expected_success from sm_history where job_id = {} order by id desc limit 1".format(job_id)
+            cur.execute(query)
+            result = cur.fetchone()
+            conn.commit()
+            return { "success": True, "result": result}
+        except:
+            conn.rollback()
+            return { "success": False }
+
+
 
 
 
@@ -3182,6 +3212,8 @@ class MySiteManager(Resource):
             return self.get_err_msg(args['sm_history_id']);
         elif args['req_type'] == 'get_column_name':
             return self.get_column_name();
+        elif args['req_type'] == 'get_latest_progress':
+            return self.get_latest_progress(args['job_id']);
         return { "success": False }
 
 
