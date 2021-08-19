@@ -2291,6 +2291,31 @@ class GraphManager():
             print_flushed(str(traceback.format_exc()))
             raise
 
+
+    def update_current_num_sm_history(self, num, input_id):
+        try:
+            query = "update sm_history set num_expected_success = {} where id = {}".format(num, input_id)
+            self.gp_cur.execute(query)
+            self.gp_conn.commit()
+            return
+        except:
+            self.gp_conn.rollback()
+            print_flushed(str(traceback.format_exc()))
+            raise
+
+
+    def insert_expected_num_sm_history(self, num, input_id):
+        try:
+            query = "update sm_history set num_expected_all = {} where id = {}".format(num, input_id)
+            self.gp_cur.execute(query)
+            self.gp_conn.commit()
+            return
+        except:
+            self.gp_conn.rollback()
+            print_flushed(str(traceback.format_exc()))
+            raise
+
+
     # (id integer primary key generated always as identity, sm_history_id bigint, start_time timestamp, end_time timestamp, targetsite text, job_id integer);
     def insert_mt_history(self, targetsite, start_time, job_id, sm_history_id):
         try:
@@ -2840,11 +2865,10 @@ class GraphManager():
             raise
 
     # failed_my_site_detail (id integer primary key generated always as identity, sm_history_id integer, err_msg text);
-    def log_err_msg_of_my_site(self, sm_history_id, mpid, err_msg):
+    def log_err_msg_of_my_site(self, sm_history_id, mpid, err_msg, node_id = 0):
         try:
             err_msg = err_msg.replace("'", '"')
-            query = "insert into failed_my_site_detail(sm_history_id, mpid, err_msg) values({}, {}, '{}')".format(
-                sm_history_id, mpid, err_msg)
+            query = "insert into failed_my_site_detail(sm_history_id, mpid, err_msg, node_id) values({}, {}, '{}', {})".format(sm_history_id, mpid, err_msg, node_id)
             self.gp_cur.execute(query)
             self.gp_conn.commit()
             return

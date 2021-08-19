@@ -333,6 +333,7 @@ class PseDriver():
             print_flushed(
                 '====================== Transform to mysite schema ======================')
             print_flushed('============  Delete deleted items of job id = {}  ============='.format(args.job_id))
+            self.graph_manager.insert_expected_num_sm_history(len(node_ids), sm_history_id)
 
             # Delete deleted item from my site
             err_op = 'Delete deleted product in my site'
@@ -348,7 +349,7 @@ class PseDriver():
             log_url = ''
             num_out_of_stock = 0
             print_flushed("# of items: ", len(node_ids))
-
+            num_success = 0
             for node_id in node_ids:
                 try:
                     node_properties = self.graph_manager.get_node_properties(node_id)
@@ -370,15 +371,14 @@ class PseDriver():
                         self.graph_manager.log_to_job_current_mysite_working(
                             '\n{}\n[Running] Insert and Update {} items to mysite'.format(cur_time, num), args.job_id)
                         print_flushed("Current # of inserted items to mysite : ", num)
-                    
                     # Insert and Update   
                     self.graph_manager.insert_node_property_to_mysite(
                         args.job_id, mpid, result, args.groupbykey, sm_history_id)
-              
+
 
                 except:
                     err_msg = '================================ Operator ================================ \n'
-                    err_msg += 'Update my site' + '\n\n'
+                    err_msg += 'Upload / Update to my site' + '\n\n'
                     err_msg += '================================ My site product id ================================ \n'
                     err_msg += 'My site product id: ' + \
                         str(log_mpid) + '\n\n'
@@ -387,9 +387,13 @@ class PseDriver():
                     err_msg += '================================ STACK TRACE ============================== \n' + \
                         str(traceback.format_exc())
                     print(str(traceback.format_exc()))
-                    self.graph_manager.log_err_msg_of_my_site(
-                        sm_history_id, mpid, err_msg)
+                    self.graph_manager.log_err_msg_of_my_site(sm_history_id, mpid, err_msg, node_id)
+                finally:
+                    num_success = num_success + 1
+                    if num_success % 10 == 0:
+                        self.graph_manager.update_current_num_sm_history(num_success, sm_history_id)
 
+            self.graph_manager.update_current_num_sm_history(num_success, sm_history_id)
             print_flushed("# of inserted items to mysite : ", num)
             self.graph_manager.log_to_job_current_mysite_working(
                 '\n{}\n[Finished] Insert and Update {} items to mysite'.format(cur_time, num), args.job_id)
@@ -417,8 +421,7 @@ class PseDriver():
             err_msg += ' ' + err_op  + '\n\n'
             err_msg += '================================ STACK TRACE ============================== \n' + \
                 str(traceback.format_exc())
-            self.graph_manager.log_err_msg_of_my_site(
-                sm_history_id, -1, err_msg)
+            self.graph_manager.log_err_msg_of_my_site(sm_history_id, -1, err_msg)
 
             print_flushed(traceback.format_exc())
             raise
@@ -702,7 +705,6 @@ class PseDriver():
         except:
             print_flushed(node_properties['url'], node_properties['mpid'])
             raise
-            return False
         return result
 
     def execute(self):

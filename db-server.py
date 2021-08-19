@@ -1740,7 +1740,7 @@ class TargetSiteManager(Resource): # added by mwseo
     def get_latest_progress(self, job_id):
         try:
             cur = conn.cursor()
-            query = "select num_expected_all, num_expected_success from mt_history where job_id = {} order by id desc limit 1".format(job_id)
+            query = "select num_expected_success, num_expected_all from mt_history where job_id = {} order by id desc limit 1".format(job_id)
             cur.execute(query)
             result = cur.fetchone()
             conn.commit()
@@ -2473,6 +2473,23 @@ class ProductListManager(Resource):
                               pass
                         t = tuple(lst)
                         result[idx] = t
+            query = "select mpid, node_id, -1 from failed_my_site_detail where sm_history_id in (select max(id) from sm_history where job_id = {})".format(job_id)
+            cur.execute(query)
+            result2 = cur.fetchall()
+            for idx, val in enumerate(result2):
+                query = "select value::text from node_property where key = 'name' and node_id = {}".format(val[1]) 
+                cur.execute(query)
+                name = cur.fetchone()[0][1:-1]
+                if name == "" or name is None:
+                    name = ""
+                lst = list(result2[idx])
+                lst.append(name)
+                t = tuple(lst)
+                result2[idx] = t
+            if len(result2) != 0:
+                result = result + result2
+            result.sort(key = lambda x:x[0])
+           
             return { "success": True, "result" : result }
         except:
             conn.rollback()
@@ -3033,6 +3050,20 @@ class MySiteManager(Resource):
             conn.rollback()
             return { "success": False }
 
+    def get_err_msg_mpid(self, sm_history_id, mpid):
+        try:
+            cur = conn.cursor()
+            query = "select id, mpid, err_msg from failed_my_site_detail where sm_history_id = {} and mpid = {}".format(sm_history_id, mpid)
+            cur.execute(query)
+            result = cur.fetchone()
+            conn.commit()
+            print(result)
+            return { "success": True, "result" : result }
+        except:
+            conn.rollback()
+            return { "success": False }
+
+
 
 
     def get_column_name(self):
@@ -3180,6 +3211,19 @@ class MySiteManager(Resource):
 
 
 
+    def get_smhid(self, job_id):
+        try:
+            cur = conn.cursor()
+            query = "select max(id) from sm_history where job_id = {}".format(job_id)
+            cur.execute(query)
+            result = cur.fetchone()[0]
+            conn.commit()
+            return { "success": True, "result": result}
+        except:
+            conn.rollback()
+            return { "success": False }
+
+
 
 
     def post(self):
@@ -3190,6 +3234,7 @@ class MySiteManager(Resource):
         parser.add_argument('key_name')
         parser.add_argument('key_id')
         parser.add_argument('sm_history_id')
+        parser.add_argument('mpid')
         args = parser.parse_args()
         print(args)
         if args['req_type'] == 'save_to_mysite':
@@ -3210,10 +3255,14 @@ class MySiteManager(Resource):
             return self.get_history(args['job_id']);
         elif args['req_type'] == 'get_err_msg':
             return self.get_err_msg(args['sm_history_id']);
+        elif args['req_type'] == 'get_err_msg_mpid':
+            return self.get_err_msg_mpid(args['sm_history_id'], args['mpid']);
         elif args['req_type'] == 'get_column_name':
             return self.get_column_name();
         elif args['req_type'] == 'get_latest_progress':
             return self.get_latest_progress(args['job_id']);
+        elif args['req_type'] == 'get_smhid':
+            return self.get_smhid(args['job_id']);
         return { "success": False }
 
 
