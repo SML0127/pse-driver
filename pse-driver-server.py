@@ -110,7 +110,7 @@ class DriverManager(Resource):
             graph_manager = GraphManager()
             graph_manager.init(settings)
             groupby_keys = graph_manager.get_groupby_key(job_id)
-            cmd_update_mysite = "clear;python pse_driver.py --c update_to_mysite --job_id {} --groupbykey".format(job_id)  
+            cmd_update_mysite = "clear;python pse_driver.py --c update_to_mysite --job_id {} ".format(job_id)  
             for idx in groupby_keys:
                cmd_update_mysite += " " + str(idx)
             print_flushed(cmd_update_mysite)
