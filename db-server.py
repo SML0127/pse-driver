@@ -1743,11 +1743,79 @@ class TargetSiteManager(Resource): # added by mwseo
             query = "select num_expected_success, num_expected_all from mt_history where job_id = {} order by id desc limit 1".format(job_id)
             cur.execute(query)
             result = cur.fetchone()
-            conn.commit()
+            if result is None:
+                result = (0, 0)
             return { "success": True, "result": result}
         except:
             conn.rollback()
             return { "success": False }
+
+    def get_uploaded_targetsites(self, job_id):
+        try:
+            cur = conn.cursor()
+            query = "select distinct targetsite from mt_history where job_id = {} order by targetsite".format(job_id)
+            cur.execute(query)
+            result = cur.fetchall()
+            for idx, val in enumerate(result):
+               for idx2, val2 in enumerate(val):
+                  if idx2 == 0:
+                     lst = list(result[idx])
+                     if is_hex_str(val2) == False:
+                        lst[idx2] = val2
+                     else:
+                        lst[idx2] = bytes.fromhex(val2).decode()
+                     t = tuple(lst)
+                     result[idx] = t
+            return { "success": True, "result": result}
+        except:
+            conn.rollback()
+            return { "success": False }
+
+    def get_product_list(self, job_id, targetsite):
+        try:
+            cur = conn.cursor()
+            query = "select mpid, name, url, price, shipping_price, brand, weight, shipping_weight, shipping_price1, source_site_product_id, status, image_url, currency, stock, num_options, num_images from job_source_view where mpid in (select mpid from job_id_and_mpid where job_id = {}) and status != 4".format(job_id)
+            cur.execute(query)
+            result = cur.fetchall()
+
+            query = "select mpid from failed_target_site_detail where mt_history_id in (select max(id) from mt_history where job_id = {} and targetsite = '{}')".format(job_id, targetsite)
+            print(query)
+            cur.execute(query)
+            result2 = cur.fetchall()
+            failed_mpids = []
+            for idx, val in enumerate(result2):
+                failed_mpids.append(val)
+
+          
+            if len(result) == 0:
+               result = []
+            else:
+               for idx, val in enumerate(result):
+                  for idx2, val2 in enumerate(val):
+                     if idx2 == 0:
+                        if val2 in failed_mpids:
+                           result[idx] = result[idx] + (False,)
+                        else:
+                           result[idx] = result[idx] + (True,)
+                     if idx2 == 1 or idx2 == 3 or idx2 == 4 or idx2 == 5:
+                        lst = list(result[idx])
+                        if is_hex_str(val2) == False:
+                           lst[idx2] = val2
+                        else:
+                           try:
+                              lst[idx2] = bytes.fromhex(val2).decode()
+                           except:
+                              lst[idx2] = val2
+                              pass
+                        t = tuple(lst)
+                        result[idx] = t
+           
+            return { "success": True, "result" : result }
+        except:
+            conn.rollback()
+            print(str(traceback.format_exc()))
+            return { "success": False }
+
 
 
 
@@ -1762,6 +1830,7 @@ class TargetSiteManager(Resource): # added by mwseo
         parser.add_argument('gateway')
         parser.add_argument('mt_history_id')
         parser.add_argument('job_id')
+        parser.add_argument('targetsite')
         args = parser.parse_args()
         if args['req_type'] == 'get_target_sites':
             return self.get_target_sites(args['user_id'])
@@ -1777,6 +1846,10 @@ class TargetSiteManager(Resource): # added by mwseo
             return self.get_history(args['job_id'])
         elif args['req_type'] == 'get_latest_progress':
             return self.get_latest_progress(args['job_id'])
+        elif args['req_type'] == 'get_uploaded_targetsites':
+            return self.get_uploaded_targetsites(args['job_id'])
+        elif args['req_type'] == 'get_product_list':
+            return self.get_product_list(args['job_id'], args['targetsite'])
 
 class DeliveryManager(Resource): # added by mwseo
     def get_delivery_companies(self, user_id):
@@ -2445,7 +2518,7 @@ class ProductListManager(Resource):
             print(str(traceback.format_exc()))
             return { "success": False }
 
-    def get_product_list(self, user_id, job_id, statu):
+    def get_product_list(self,job_id, statu):
         try:
             cur = conn.cursor()
             statu = int(statu)
@@ -2872,7 +2945,7 @@ class ProductListManager(Resource):
         args = parser.parse_args()
         print(args)
         if args['req_type'] == 'get_product_list':
-            return self.get_product_list(args['user_id'], args['job_id'],args['statu']);
+            return self.get_product_list(args['job_id'],args['statu']);
         elif args['req_type'] == 'get_product_history':
             return self.get_product_history(args['job_id']);
         elif args['req_type'] == 'get_product_history_name':
