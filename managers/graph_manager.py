@@ -1169,6 +1169,28 @@ class GraphManager():
             print_flushed(str(traceback.format_exc()))
             raise e
 
+    def log_expected_num_target_success(self, mt_history_id, cnt, targetsite):
+        try:
+            query = "update mt_history set num_expected_success = num_expected_success + {} where id = {} and targetsite = '{}';COMMIT;".format(cnt, mt_history_id, targetsite)
+            self.pg_cur.execute(query)
+            return 
+        except Exception as e:
+            self.pg_conn.rollback()
+            print_flushed(str(traceback.format_exc()))
+            raise e
+
+    def log_expected_num_target_all(self, mt_history_id, cnt, targetsite):
+        try:
+            query = "update mt_history set num_expected_all = {} where id = {} and targetsite = '{}';COMMIT;".format(cnt, mt_history_id, targetsite)
+            self.pg_cur.execute(query)
+            return 
+        except Exception as e:
+            self.pg_conn.rollback()
+            print_flushed(str(traceback.format_exc()))
+            raise e
+
+
+
     def find_nodes_of_execution_with_label(self, exec_id, label):
         try:
             query = 'select n.id'

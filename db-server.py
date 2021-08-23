@@ -1737,10 +1737,12 @@ class TargetSiteManager(Resource): # added by mwseo
             conn.rollback()
             return { "success": False }
 
-    def get_latest_progress(self, job_id):
+    def get_latest_progress(self, job_id, targetsite):
         try:
             cur = conn.cursor()
-            query = "select num_expected_success, num_expected_all from mt_history where job_id = {} order by id desc limit 1".format(job_id)
+            targetsite = str(targetsite).encode().hex()
+            query = "select num_expected_success, num_expected_all from mt_history where job_id = {} and targetsite = '{}' order by id desc limit 1".format(job_id, targetsite)
+            print(query)
             cur.execute(query)
             result = cur.fetchone()
             if result is None:
@@ -1774,18 +1776,29 @@ class TargetSiteManager(Resource): # added by mwseo
     def get_product_list(self, job_id, targetsite):
         try:
             cur = conn.cursor()
-            query = "select mpid, name, url, price, shipping_price, brand, weight, shipping_weight, shipping_price1, source_site_product_id, status, image_url, currency, stock, num_options, num_images from job_source_view where mpid in (select mpid from job_id_and_mpid where job_id = {}) and status != 4".format(job_id)
+            targetsite = str(targetsite).encode().hex()
+            query = "select mpid from all_uploaded_product where mt_history_id in (select max(id) from mt_history where job_id = {} and targetsite = '{}')".format(job_id, targetsite)
             cur.execute(query)
-            result = cur.fetchall()
+            result2 = cur.fetchall()
+            succ_mpids = []
+            for idx, val in enumerate(result2):
+                succ_mpids.append(val[0])
+            #mpids_str = '( '
+            #for idx, mpid in enumerate(result2):
+            #    mpids_str += str(mpid) + ', '
+            #mpids_str = mpids_str[0:-2] + ')'
 
             query = "select mpid from failed_target_site_detail where mt_history_id in (select max(id) from mt_history where job_id = {} and targetsite = '{}')".format(job_id, targetsite)
-            print(query)
             cur.execute(query)
             result2 = cur.fetchall()
             failed_mpids = []
             for idx, val in enumerate(result2):
                 failed_mpids.append(val)
-
+                
+            query = "select mpid, name, url, price, shipping_price, brand, weight, shipping_weight, shipping_price1, source_site_product_id, status, image_url, currency, stock, num_options, num_images from job_source_view where mpid in (select mpid from job_id_and_mpid where job_id = {}) and status != 4".format(job_id)
+            cur.execute(query)
+            result = cur.fetchall()
+            
           
             if len(result) == 0:
                result = []
@@ -1795,8 +1808,10 @@ class TargetSiteManager(Resource): # added by mwseo
                      if idx2 == 0:
                         if val2 in failed_mpids:
                            result[idx] = result[idx] + (False,)
-                        else:
+                        elif val2 in succ_mpids:
                            result[idx] = result[idx] + (True,)
+                        else:
+                           result[idx] = result[idx] + (-1,)
                      if idx2 == 1 or idx2 == 3 or idx2 == 4 or idx2 == 5:
                         lst = list(result[idx])
                         if is_hex_str(val2) == False:
@@ -1845,7 +1860,7 @@ class TargetSiteManager(Resource): # added by mwseo
         elif args['req_type'] == 'get_history':
             return self.get_history(args['job_id'])
         elif args['req_type'] == 'get_latest_progress':
-            return self.get_latest_progress(args['job_id'])
+            return self.get_latest_progress(args['job_id'], args['targetsite'])
         elif args['req_type'] == 'get_uploaded_targetsites':
             return self.get_uploaded_targetsites(args['job_id'])
         elif args['req_type'] == 'get_product_list':

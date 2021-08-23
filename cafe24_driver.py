@@ -30,9 +30,11 @@ class Cafe24Driver():
     self.graph_manager.init(settings)
 
 
+  #def wait(self, running_tasks, targetsite, num_product_per_task, mt_history_id):
   def wait(self, running_tasks):
     start_time = time.time()
     successful_tasks, failed_tasks = [], []
+    prev_cnt = 0
     while len(running_tasks) > 0:
       indexes = []
       for idx, task in enumerate(running_tasks):
@@ -46,6 +48,14 @@ class Cafe24Driver():
       for val in sorted(indexes, reverse = True):
         running_tasks.pop(val)
       print("### SUCCESSFUL: {}, FAILED: {}, RUNNING: {} ".format(len(successful_tasks), len(failed_tasks), len(running_tasks)))
+      #cnt = len(successful_tasks) + len(failed_tasks) - prev_cnt
+      #if cnt != 0 and cnt != prev_cnt:
+      #  if num_product_per_task != 30:
+      #    self.graph_manager.log_expected_num_target_success(mt_history_id, int(cnt) * int(num_product_per_task), targetsite) 
+      #    num_product_per_task = 30
+      #else:
+      #  self.graph_manager.log_expected_num_target_success(mt_history_id, int(cnt) * int(num_product_per_task), targetsite) 
+      #prev_cnt = len(successful_tasks) + len(failed_tasks)  
       time.sleep(10)
 
     for task in successful_tasks:
@@ -55,7 +65,7 @@ class Cafe24Driver():
     print('elapsed time per step:', time.time() - start_time)
     return len(successful_tasks)
 
-  def run(self, args, node_ids):
+  def run(self, args, mpids):
     mt_history_id = -1
     #smlee
     sm_history_id = self.graph_manager.get_latest_sm_history_id(args['job_id']) 
@@ -72,8 +82,8 @@ class Cafe24Driver():
       running_tasks = []
       
       num_product_per_task = 30
-      print("# of task "+str(int(len(node_ids))))
-      end = int(len(node_ids) / num_product_per_task) + 1
+      print("# of task "+str(int(len(mpids))))
+      end = int(len(mpids) / num_product_per_task) + 1
       print("end "+str(int(end)))
       num_threads_per_worker = args['num_threads']
 
@@ -94,22 +104,28 @@ class Cafe24Driver():
       cur_time = datetime.utcnow() + time_gap
       cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
       self.graph_manager.re_log_to_job_current_targetsite_working('\n{}\n[Start] Uploading / Update / Delete items to {}'.format(cur_time, targetsite_label), args['job_id']) 
+      num_task_in_job = -1
+      self.graph_manager.log_expected_num_target_all(mt_history_id, len(mpids), targetsite_label_encode)
       for idx in range(end):
         job = {}
-        job['mpids'] = node_ids[(idx)*num_product_per_task:(idx+1)*num_product_per_task]
+        job['mpids'] = mpids[(idx)*num_product_per_task:(idx+1)*num_product_per_task]
+        num_task_in_job = len(job['mpids'])
         job['args'] = args.copy()
         job['args']['clients'] = clients_per_worker[num_workers]
         job['args']['mt_history_id'] = mt_history_id 
+        job['args']['targetsite_encode'] = targetsite_label_encode
         #print(job)
         running_tasks.append(self.redis_manager.enqueue(job))
         num_workers += 1
         if num_workers == max_num_workers:
+          #num_s = self.wait(running_tasks, targetsite_label_encode, num_task_in_job, mt_history_id)
           num_s = self.wait(running_tasks)
           #total_num_s += num_s
           num_workers = 0
           cur_time = datetime.utcnow() + time_gap
           cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
           self.graph_manager.log_to_job_current_targetsite_working('\n{}\n[Running] Uploading / Update / Delete items to {}'.format(cur_time, targetsite_label), args['job_id']) 
+      #num_s = self.wait(running_tasks, targetsite_label_encode, num_task_in_job, mt_history_id)
       num_s = self.wait(running_tasks)
       #total_num_s += num_s
       cur_time = datetime.utcnow() + time_gap
@@ -171,10 +187,9 @@ class Cafe24Driver():
     #targetsite_ids = [36]
     input_args = args
     for tsid in targetsite_ids:
-      print(tsid)
       #smlee
       exec_id = self.graph_manager.get_latest_eid_from_job_id(job_id)
-      #exec_id = -1
+      
       #label = self.graph_manager.get_max_label_from_eid(exec_id)
       max_items = self.graph_manager.get_max_items_from_tsid(tsid)
       #mpids = self.graph_manager.get_mpid_from_mysite_without_up_to_date(job_id, max_items)
@@ -186,9 +201,7 @@ class Cafe24Driver():
       targs = json.loads(self.graph_manager.get_selected_gateway_configuration_program_onetime(tsid))
       targs.update(input_args)
       args = targs
-      #args = {}
-      #print(args)
-      print(args)
+   
       args['onetime'] = True
       args['code'] = self.graph_manager.get_selected_transformation_program_onetime(tsid)
       args['tsid'] = tsid
@@ -201,10 +214,9 @@ class Cafe24Driver():
       kor_time = utcnow + time_gap
       self.graph_manager.update_last_mt_date_in_job_configuration(datetime.strptime(str(kor_time),"%Y-%m-%d %H:%M:%S.%f").strftime("%Y-%m-%d %H:%M:%S"), job_id, tsid)
       print("num of item to upload / update / deleted: ", len(mpids))
-      #print(args)
+  
       self.run(args, mpids)
       print("elapsed time: ", time.time() - start_time)
-
 
 
   def run_scheduled_upload(self, args):
@@ -213,7 +225,7 @@ class Cafe24Driver():
     job_id = args['job_id']
     tsid = args['target_id']
     exec_id = self.graph_manager.get_latest_eid_from_job_id(job_id)
-    #label = self.graph_manager.get_max_label_from_eid(exec_id)
+    
     max_items = self.graph_manager.get_max_items_from_tsid(tsid)
     #mpids = self.graph_manager.get_mpid_from_mysite_without_up_to_date(job_id, max_items)
     mpids = self.graph_manager.get_mpid_from_mysite(job_id, max_items)
@@ -222,13 +234,12 @@ class Cafe24Driver():
     targs.update(args)
     args = targs
 
-    #args['code'] = self.graph_manager.get_selected_transformation_program(job_id)
+    
     args['code'] = self.graph_manager.get_selected_transformation_program_onetime(tsid)
-    #args['label'] = label
     args['execution_id'] = exec_id
     args['tsid'] = tsid
     args['num_threads'] = 1#self.graph_manager.get_num_threads_in_job_configuration_onetime(job_id)
-    args['max_num_workers'] = 6#self.graph_manager.get_num_worker_in_job_configuration_onetime(tsid)
+    args['max_num_workers'] = 10#self.graph_manager.get_num_worker_in_job_configuration_onetime(tsid)
 
     utcnow = datetime.utcnow()
     time_gap = timedelta(hours=9)
@@ -251,11 +262,7 @@ class Cafe24Driver():
     mpids = self.graph_manager.get_mpid_from_mysite(args['job_id'], max_items)
     job_id = self.graph_manager.get_job_id_from_eid(exec_id)
     utcnow = datetime.utcnow()
-    time_gap = timedelta(hours=9)
-    kor_time = utcnow + time_gap
-    self.graph_manager.update_last_mt_date_in_job_configuration(datetime.strptime(str(kor_time),"%Y-%m-%d %H:%M:%S.%f").strftime("%Y-%m-%d %H:%M:%S"), job_id)
-    print("num of item to upload / update / deleted: ", len(mpids))
-    #print(args)
+    time_gap = ti
     self.run(args, mpids)
     print("elapsed time: ", time.time() - start_time)
 
