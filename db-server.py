@@ -431,6 +431,7 @@ class TaskManager(Resource):
         try:
             cur = conn.cursor()
             query = "select err_msg from failed_task_detail where task_id in (select task_id from node where id = {});".format(node_id)
+            print(query)
             cur.execute(query)
             results = cur.fetchone()[0]
             return {"success" : True, "result" : results}
@@ -1169,7 +1170,7 @@ class ExecutionsManager(Resource):
 
     def get_latest_progress(self, job_id):
         try:
-            query = "select num_expected_all, num_expected_success from execution where job_id = {} order by id desc limit 1;".format(job_id)
+            query = "select num_expected_success, num_expected_all from execution where job_id = {} order by id desc limit 1;".format(job_id)
             cur = conn.cursor()
             cur.execute(query)
             result = cur.fetchone()
@@ -1777,24 +1778,22 @@ class TargetSiteManager(Resource): # added by mwseo
         try:
             cur = conn.cursor()
             targetsite = str(targetsite).encode().hex()
-            query = "select mpid from all_uploaded_product where mt_history_id in (select max(id) from mt_history where job_id = {} and targetsite = '{}')".format(job_id, targetsite)
+            query = "select mpid, status from all_uploaded_product where mt_history_id in (select max(id) from mt_history where job_id = {} and targetsite = '{}')".format(job_id, targetsite)
             cur.execute(query)
             result2 = cur.fetchall()
             succ_mpids = []
+            mpids_status = {}
             for idx, val in enumerate(result2):
                 succ_mpids.append(val[0])
-            #mpids_str = '( '
-            #for idx, mpid in enumerate(result2):
-            #    mpids_str += str(mpid) + ', '
-            #mpids_str = mpids_str[0:-2] + ')'
+                mpids_status[val[0]] = val[1]
 
             query = "select mpid from failed_target_site_detail where mt_history_id in (select max(id) from mt_history where job_id = {} and targetsite = '{}')".format(job_id, targetsite)
             cur.execute(query)
             result2 = cur.fetchall()
             failed_mpids = []
             for idx, val in enumerate(result2):
-                failed_mpids.append(val)
-                
+                failed_mpids.append(val[0])
+
             query = "select mpid, name, url, price, shipping_price, brand, weight, shipping_weight, shipping_price1, source_site_product_id, status, image_url, currency, stock, num_options, num_images from job_source_view where mpid in (select mpid from job_id_and_mpid where job_id = {}) and status != 4".format(job_id)
             cur.execute(query)
             result = cur.fetchall()
@@ -1807,11 +1806,11 @@ class TargetSiteManager(Resource): # added by mwseo
                   for idx2, val2 in enumerate(val):
                      if idx2 == 0:
                         if val2 in failed_mpids:
-                           result[idx] = result[idx] + (False,)
+                           result[idx] = result[idx] + (False, mpids_status[val2],)
                         elif val2 in succ_mpids:
-                           result[idx] = result[idx] + (True,)
+                           result[idx] = result[idx] + (True, mpids_status[val2],)
                         else:
-                           result[idx] = result[idx] + (-1,)
+                           result[idx] = result[idx] + (-1, -1,)
                      if idx2 == 1 or idx2 == 3 or idx2 == 4 or idx2 == 5:
                         lst = list(result[idx])
                         if is_hex_str(val2) == False:
@@ -1824,6 +1823,28 @@ class TargetSiteManager(Resource): # added by mwseo
                               pass
                         t = tuple(lst)
                         result[idx] = t
+           
+            return { "success": True, "result" : result }
+        except:
+            conn.rollback()
+            print(str(traceback.format_exc()))
+            return { "success": False }
+
+
+    def get_err_msg_mpid(self, targetsite, mpid):
+        try:
+            cur = conn.cursor()
+            targetsite = str(targetsite).encode().hex()
+            query = "select id, mpid, err_msg from failed_target_site_detail where mt_history_id in (select max(id) from mt_history where targetsite = '{}') and mpid = {}".format(targetsite, mpid)
+            cur.execute(query)
+            result = cur.fetchone()
+            
+            if len(result) == 0:
+               result = []
+            else:
+               lst = list(result)
+               lst[2] = bytes.fromhex(lst[2]).decode()
+               result = tuple(lst)
            
             return { "success": True, "result" : result }
         except:
@@ -1846,6 +1867,7 @@ class TargetSiteManager(Resource): # added by mwseo
         parser.add_argument('mt_history_id')
         parser.add_argument('job_id')
         parser.add_argument('targetsite')
+        parser.add_argument('mpid')
         args = parser.parse_args()
         if args['req_type'] == 'get_target_sites':
             return self.get_target_sites(args['user_id'])
@@ -1865,6 +1887,8 @@ class TargetSiteManager(Resource): # added by mwseo
             return self.get_uploaded_targetsites(args['job_id'])
         elif args['req_type'] == 'get_product_list':
             return self.get_product_list(args['job_id'], args['targetsite'])
+        elif args['req_type'] == 'get_err_msg_mpid':
+            return self.get_err_msg_mpid(args['targetsite'], args['mpid'])
 
 class DeliveryManager(Resource): # added by mwseo
     def get_delivery_companies(self, user_id):
@@ -3120,7 +3144,6 @@ class MySiteManager(Resource):
               query = "select * from products where user_id = '" + user_id +"' and job_id = "+job_id+ " and status = "+ statu+ ";"
             cur.execute(query)
             result = cur.fetchall()
-            conn.commit()
             return { "success": True, "result" : result }
         except:
             conn.rollback()
@@ -3132,7 +3155,6 @@ class MySiteManager(Resource):
             query = "select id, mpid, err_msg from failed_my_site_detail where sm_history_id = {}".format(sm_history_id)
             cur.execute(query)
             result = cur.fetchall()
-            conn.commit()
             return { "success": True, "result" : result }
         except:
             conn.rollback()
@@ -3144,8 +3166,6 @@ class MySiteManager(Resource):
             query = "select id, mpid, err_msg from failed_my_site_detail where sm_history_id = {} and mpid = {}".format(sm_history_id, mpid)
             cur.execute(query)
             result = cur.fetchone()
-            conn.commit()
-            print(result)
             return { "success": True, "result" : result }
         except:
             conn.rollback()
@@ -3188,7 +3208,6 @@ class MySiteManager(Resource):
                         lst[idx2] = bytes.fromhex(val2).decode()
                      t = tuple(lst)
                      result[idx] = t
-            conn.commit()
             return { "success": True, "result" : result }
         except:
             conn.rollback()
@@ -3236,7 +3255,6 @@ class MySiteManager(Resource):
                         lst[idx2] = bytes.fromhex(val2).decode()
                      t = tuple(lst)
                      result[idx] = t
-            conn.commit()
             return { "success": True, "result" : result }
         except:
             conn.rollback()
