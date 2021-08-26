@@ -1180,6 +1180,19 @@ class ExecutionsManager(Resource):
             print (str(traceback.format_exc()))
             return { "success": False }
 
+    def get_latest_progress_summary(self, job_id):
+        try:
+            query = "select num_summary_expected_success, num_summary_expected_all from execution where job_id = {} order by id desc limit 1;".format(job_id)
+            cur = conn.cursor()
+            cur.execute(query)
+            result = cur.fetchone()
+            return { "success": True, "result": result }
+        except:
+            conn.rollback()
+            print (str(traceback.format_exc()))
+            return { "success": False }
+
+
 
 
 
@@ -1213,6 +1226,8 @@ class ExecutionsManager(Resource):
             return self.get_data(args['execution_id'])
         elif args['req_type'] == 'get_latest_progress':
             return self.get_latest_progress(args['job_id'])
+        elif args['req_type'] == 'get_latest_progress_summary':
+            return self.get_latest_progress_summary(args['job_id'])
         return {}
 
 
@@ -2820,16 +2835,30 @@ class ProductListManager(Resource):
             query = "select max(id) from execution where job_id = {}".format(job_id)
             cur.execute(query)
             execution_id = cur.fetchone()[0]
-            query = "select max(id), min(id) from stage where execution_id = {}".format(execution_id)
+            query = "select count(*) from stage where execution_id = {}".format(execution_id)
             cur.execute(query)
-            result = cur.fetchone() 
-            max_s_id = result[0] 
-            min_s_id = result[1] 
+            num_stage = cur.fetchone()[0]
+            if int(num_stage) == 2:
+                query = "select max(id) from stage where execution_id = {}".format(execution_id)
+                cur.execute(query)
+                result = cur.fetchone() 
+                max_s_id = result[0] 
 
-            query = "select t2.status, t3.value::text, t1.id from node as t1, (select id, status from task where stage_id in (select id from stage where execution_id = {} and id != {} and id != {})) as t2, node_property as t3 where t1.task_id = t2.id and t3.node_id = t1.id and t3.key = 'url' order by t1.id asc".format(execution_id,max_s_id, min_s_id)
-            cur.execute(query)
-            results = cur.fetchall() 
-            return { "success": True, "result": results }
+                query = "select t2.status, t3.value::text, t1.id from node as t1, (select id, status from task where stage_id in (select id from stage where execution_id = {} and id = {} )) as t2, node_property as t3 where t1.task_id = t2.id and t3.node_id = t1.id and t3.key = 'url' order by t1.id asc".format(execution_id,max_s_id)
+                cur.execute(query)
+                results = cur.fetchall() 
+                return { "success": True, "result": results }
+            else:
+                query = "select max(id), min(id) from stage where execution_id = {}".format(execution_id)
+                cur.execute(query)
+                result = cur.fetchone() 
+                max_s_id = result[0] 
+                min_s_id = result[1] 
+
+                query = "select t2.status, t3.value::text, t1.id from node as t1, (select id, status from task where stage_id in (select id from stage where execution_id = {} and id != {} and id != {})) as t2, node_property as t3 where t1.task_id = t2.id and t3.node_id = t1.id and t3.key = 'url' order by t1.id asc".format(execution_id,max_s_id, min_s_id)
+                cur.execute(query)
+                results = cur.fetchall() 
+                return { "success": True, "result": results }
         except:
             conn.rollback()
             print (str(traceback.format_exc()))

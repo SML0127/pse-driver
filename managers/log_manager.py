@@ -238,7 +238,20 @@ class LogManager():
             self.conn.rollback()
             raise LogMgrErr(e)
 
-    def get_failed_tasks_of_level(self, execution_id, level):
+    def get_failed_tasks_of_level(self, execution_id):
+        try:
+            query = "select t.id, ti.input "
+            query += "from stage s, task t, task_input ti "
+            query += "where s.level = max(s.level) and s.execution_id = %s and t.status < 1 "
+            query += "and s.id = t.stage_id and ti.task_id = t.id;"
+            self.cur.execute(query, str(execution_id))
+            result = self.cur.fetchall()
+            return result
+        except Exception as e:
+            self.conn.rollback()
+            raise LogMgrErr(e)
+
+    def get_failed_tasks_of_levelOLD(self, execution_id, level):
         try:
             query = "select t.id, ti.input "
             query += "from stage s, task t, task_input ti "
