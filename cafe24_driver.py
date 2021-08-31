@@ -83,7 +83,11 @@ class Cafe24Driver():
       
       num_product_per_task = 30
       print("# of task "+str(int(len(mpids))))
-      end = int(len(mpids) / num_product_per_task) + 1
+      end = 1
+      if len(mpids) % num_product_per_task == 0:
+        end = int(len(mpids) / num_product_per_task)
+      else:
+        end = int(len(mpids) / num_product_per_task) + 1
       print("end "+str(int(end)))
       num_threads_per_worker = args['num_threads']
 
