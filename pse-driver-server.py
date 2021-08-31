@@ -376,6 +376,17 @@ class DriverManager(Resource):
             print (str(traceback.format_exc()))
             return { "success": False, "traceback": str(traceback.format_exc()) }       
 
+    def rerun_driver(self, wf, job_id):
+        try:
+            subprocess.Popen("python pse_driver.py --c rerun_from_db --wf {} --job_id {}".format(wf, job_id), shell=True)
+            return {
+                "success": True,
+            }
+        except:
+            print (str(traceback.format_exc()))
+            return { "success": False, "traceback": str(traceback.format_exc()) }       
+
+
 
 
 
@@ -418,6 +429,8 @@ class DriverManager(Resource):
             return self.register_program_execution(args['program'], args['category'])
         elif args['req_type'] == "run_driver":
             return self.run_driver(args['wf'], args['job_id'])
+        elif args['req_type'] == "rerun_driver":
+            return self.rerun_driver(args['wf'], args['job_id'])
         elif args['req_type'] == "run_transformation_to_mysite":
             return self.run_transformation_to_mysite(args['job_id'])
         elif args['req_type'] == "update_mysite":

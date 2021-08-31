@@ -117,11 +117,12 @@ class PseDriver():
             print_flushed("---------------------------------------")
             raise e
 
-    def rerun(self, program, previous_eid, eid):
+    def rerun(self, program, previous_eid, eid, job_id):
         try:
             self.init_program(program)
             program['lm'] = self.log_manager
             program['execution_id'] = eid
+            program['job_id'] = job_id
             dag_scheduler = DagScheduler()
             dag_scheduler.rerun(program, previous_eid)
         except Exception as e:
@@ -153,12 +154,11 @@ class PseDriver():
         return eid
 
     def run_from_db(self, args):
-        pid = args.wf
-        program = self.load_program_from_db(pid)
+        program = self.load_program_from_db(args.wf)
         job_id = -1
         if args.job_id is not None:
             job_id = args.job_id
-            eid = self.log_manager.start_execution(pid, 0, job_id)
+            eid = self.log_manager.start_execution(args.wf, 0, job_id)
         try:
             self.run(program, eid, job_id)
             self.log_manager.end_execution(eid, {"status": 1})
@@ -167,6 +167,26 @@ class PseDriver():
                 eid, {"status": -1, "error": str(traceback.format_exc())})
             raise e
         return eid
+
+    def rerun_from_db(self, args):
+        program = self.load_program_from_db(args.wf)
+        job_id = -1
+        previous_eid = -1
+        if args.job_id is not None:
+            job_id = args.job_id
+            previous_eid, c_date = self.log_manager.get_lastest_no_rerun_execution_id_using_job_id(job_id)
+            eid = self.log_manager.start_execution(args.wf, previous_eid, job_id)
+        try:
+            self.rerun(program, previous_eid, eid, job_id)
+        except Exception as e:
+            self.log_manager.end_execution(
+                eid, {"status": -1, "error": str(traceback.format_exc())})
+            raise e
+        self.log_manager.end_execution(eid, {"status": 1})
+        return eid
+
+
+
 
     def run_execution(self, args):
         program = self.log_manager.load_program_of_execution(args.eid)
@@ -215,84 +235,6 @@ class PseDriver():
             raise
         return
 
-    #def transform_to_mysite(self, args, sm_history_id):
-    #    num = 0
-    #    num_out_of_stock = 0
-    #    try:
-    #        exec_id, c_date = self.log_manager.get_lastest_execution_id_using_job_id(
-    #            args.job_id)
-    #        c_date = datetime.strptime(
-    #            str(c_date), "%Y-%m-%d %H:%M:%S.%f").strftime("%Y-%m-%d %H:%M:%S")
-    #        node_ids = self.graph_manager.find_nodes_of_execution(exec_id)
-    #        print_flushed('Execution id: ', exec_id)
-    #        print_flushed("(Transform to my site) # of items: ", len(node_ids))
-    #        print_flushed('Groupby key: ', args.groupbykey)
-
-    #        time_gap = timedelta(hours=9)
-    #        cur_time = datetime.utcnow() + time_gap
-    #        cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
-    #        self.graph_manager.re_log_to_job_current_mysite_working(
-    #            '{}\n[Running] Upload 0 items to mysite'.format(cur_time), args.job_id)
-    #        mpid = 0
-    #        for node_id in node_ids:
-    #            try:
-    #                node_properties = self.graph_manager.get_node_properties(
-    #                    node_id)
-    #                node_properties['c_date'] = c_date
-    #                mpid = node_properties['mpid']
-    #                result = self.transform_node_property_for_mysite(
-    #                    node_id, node_properties)
-    #                if result is False:
-    #                    num_out_of_stock = num_out_of_stock + 1
-    #                    continue
-    #                self.graph_manager.insert_node_property_to_mysite(
-    #                    args.job_id, result, args.groupbykey)
-    #                num = num + 1
-    #                if num % 50 == 0:
-    #                    cur_time = datetime.utcnow() + time_gap
-    #                    cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
-    #                    self.graph_manager.log_to_job_current_mysite_working(
-    #                        '\n{}\n[Running] Upload {} items to mysite'.format(cur_time, num), args.job_id)
-    #                    print_flushed("Current # of inserted items to mysite : ", num)
-    #            except:
-    #                err_msg = '================================ Operator ============================== \n'
-    #                err_msg += ' Transform data from source to my site \n\n'
-    #                err_msg += '================================ STACK TRACE ============================== \n' + \
-    #                    str(traceback.format_exc())
-    #                self.graph_manager.log_err_msg_of_my_site(
-    #                    sm_history_id, mpid, err_msg)
-    #        cur_time = datetime.utcnow() + time_gap
-    #        cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
-
-    #    except:
-    #        err_msg = '================================ Operator ============================== \n'
-    #        err_msg += ' Logging in transforming data from source to my site \n\n'
-    #        err_msg += '================================ STACK TRACE ============================== \n' + \
-    #            str(traceback.format_exc())
-    #        self.graph_manager.log_err_msg_of_my_site(
-    #            sm_history_id, -1, err_msg)
-
-    #    try:
-    #        print_flushed(
-    #            '====================== Delete duplicated items in mysite ====================')
-    #        duplicate_num, d0, d1, d2, d3 = self.graph_manager.set_status_for_duplicated_data(
-    #            args.job_id)
-    #        cur_time = datetime.utcnow() + time_gap
-    #        cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
-    #        self.graph_manager.log_to_job_current_mysite_working(
-    #            '\n{}\n[Finished] Upload {} items to mysite, Duplicate {} items, Out of stock {} itmes'.format(cur_time, num, duplicate_num, num_out_of_stock), args.job_id)
-    #        self.graph_manager.log_to_job_current_mysite_working(
-    #            '\nDuplicate {} items in up-to-date. \nDuplicate {} items in updated.\nDuplicate {} items in new.\nDuplicate {} items in deleted'.format(d0, d1, d2, d3), args.job_id)
-    #        print_flushed("All # of inserted items to mysite : ", num)
-    #        print_flushed('End')
-    #    except:
-    #        err_msg = '================================ Operator ============================== \n'
-    #        err_msg += ' Delete duplicated product item \n\n'
-    #        err_msg += '================================ STACK TRACE ============================== \n' + \
-    #            str(traceback.format_exc())
-    #        self.graph_manager.log_err_msg_of_my_site(
-    #            sm_history_id, -2, err_msg)
-    #    return
 
 
     def update_to_mysite(self, args):
@@ -725,10 +667,12 @@ class PseDriver():
             print_flushed(args)
             if args.c == 'run_execution':
                 return self.run_execution(args)
-            elif args.c == 'rerun_execution_from_db':
-                return self.rerun_execution_from_db(args)
-            elif args.c == 'rerun_execution_from_file':
-                return self.rerun_execution_from_file(args)
+            elif args.c == 'rerun_from_db':
+                return self.rerun_from_db(args)
+            #elif args.c == 'rerun_execution_from_db':
+            #    return self.rerun_execution_from_db(args)
+            #elif args.c == 'rerun_execution_from_file':
+            #    return self.rerun_execution_from_file(args)
             elif args.c == 'run_from_file':
                 return self.run_from_file(args)
             elif args.c == 'run_from_db':

@@ -198,28 +198,30 @@ class BFSIterator():
     cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
     graph_manager.log_to_job_current_crawling_working('\n{}\n[Finished] Crawled {} items'.format(cur_time, total_num_s), job_id) 
 
+  def rerunOLD(self, rm, results, previous_tasks):
+    if len(previous_tasks) == 0: return
+    max_num_tasks = -1
+    max_num_local_tasks = -1
+    task = self.props
+    running_tasks, num_tasks = [], 0
+    input_op_id = task['input']
+    chunk_size, max_chunk_size = 0, self.props.get('max_num_worker', 100)
+    for (previous_task_id, url) in previous_tasks:
+      if max_num_tasks > -1 and num_tasks >= max_num_tasks: break
+      task['parent_task_id'] = -1
+      task['parent_node_id'] = -1
+      task['previous_task_id'] = previous_task_id
+      task['url'] = url
+      running_tasks.append(rm.enqueue(task))
+      chunk_size += 1
+      if chunk_size == max_chunk_size:
+        chunk_size = 0
+        self.wait(rm, running_tasks, results)
+    self.wait(rm, running_tasks, results)
+
+
+
   def rerun(self, rm, results, previous_tasks):
-#    if len(previous_tasks) == 0: return
-#    max_num_tasks = -1
-#    max_num_local_tasks = -1
-#    task = self.props
-#    running_tasks, num_tasks = [], 0
-#    input_op_id = task['input']
-#    chunk_size, max_chunk_size = 0, self.props.get('max_num_worker', 100)
-#    for (previous_task_id, url) in previous_tasks:
-#      if max_num_tasks > -1 and num_tasks >= max_num_tasks: break
-#      task['parent_task_id'] = -1
-#      task['parent_node_id'] = -1
-#      task['previous_task_id'] = previous_task_id
-#      task['url'] = url
-#      running_tasks.append(rm.enqueue(task))
-#      chunk_size += 1
-#      if chunk_size == max_chunk_size:
-#        chunk_size = 0
-#        self.wait(rm, running_tasks, results)
-#    self.wait(rm, running_tasks, results)
-#
-#
     if len(previous_tasks) == 0: return
     job_id = int(self.props.get('job_id', 0))
     setting_manager = SettingsManager()
@@ -243,7 +245,11 @@ class BFSIterator():
     graph_manager.add_is_error(job_id)
     url_cnt = len(previous_tasks)
 
-    graph_manager.log_expected_num_detail(exec_id, url_cnt) 
+    
+    graph_manager.log_expected_num_detail(exec_id, url_cnt)
+    #print(previous_tasks)
+    #print(len(previous_tasks))
+    #print('{}\n[Running] Crawled 0 items (# of expected items = {})'.format(cur_time, url_cnt))
     graph_manager.re_log_to_job_current_crawling_working('{}\n[Running] Crawled 0 items (# of expected items = {})'.format(cur_time, url_cnt), job_id) 
 
     for (previous_task_id, url) in previous_tasks:
@@ -263,6 +269,7 @@ class BFSIterator():
         graph_manager.log_to_job_current_crawling_working('\n{}\n[Running] Crawled {} items'.format(cur_time, total_num_s), job_id) 
     if task['input'] in results: del results[task['input']]
     num_s, num_f = self.wait_detail_pagination(rm, running_tasks, results, graph_manager, job_id, exec_id)
+    print(num_s, num_f)
     total_num_s += num_s
     cur_time = datetime.utcnow() + time_gap 
     cur_time = cur_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -329,10 +336,10 @@ class BFSIterator():
     self.wait(rm, running_tasks, results, graph_manager, exec_id)
 
   def run(self, rm, results, previous_tasks):
-    print_flushed(self.props)
+    #print_flushed(self.props)
     if previous_tasks != None:
       self.rerun(rm, results, previous_tasks)
-    if len(self.props.get('url_query', '').strip()) > 0:
+    elif len(self.props.get('url_query', '').strip()) > 0:
       self.run1(rm, results)
     else:
       self.run0(rm, results)

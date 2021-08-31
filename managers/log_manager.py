@@ -72,6 +72,19 @@ class LogManager():
             raise LogMgrErr(e)
 
 
+    def get_lastest_no_rerun_execution_id_using_job_id(self, job_id):
+        try:
+            query = "select id, start_time from execution where job_id = {} and previous_id = 0 order by id desc limit 1;".format(job_id)
+            self.cur.execute(query)
+            result = self.cur.fetchone()
+            self.conn.commit()
+            return result
+        except Exception as e:
+            self.conn.rollback()
+            raise LogMgrErr(e)
+
+
+
     def get_lastest_execution_id_using_job_id(self, job_id):
         try:
             query = "select id, start_time from execution where job_id = {} order by id desc limit 1;".format(job_id)
@@ -219,6 +232,29 @@ class LogManager():
             self.conn.rollback()
             raise LogMgrErr(e)
 
+
+    def re_start_stage(self, execution_id, previous_eid):
+        try:
+            query = "select max(id) from stage where execution_id = {}".format(previous_eid)
+            self.cur.execute(query)
+            level = self.cur.fetchone()[0]
+           
+            time_gap = timedelta(hours=9)
+            start_time = datetime.utcnow() + time_gap
+            query = "insert into stage "
+            query += "(execution_id, level, start_time) "
+            query += "values(%s, %s, %s) returning id;"
+            self.cur.execute(query, (str(execution_id), str(level), str(start_time)))
+            result = self.cur.fetchone()[0]
+            print("start stage:  ", result)
+            print("  level: ", level)
+            print("  start_time: ", start_time)
+            self.conn.commit()
+            return result
+        except Exception as e:
+            self.conn.rollback()
+            raise LogMgrErr(e)
+
     def end_stage(self, stage_id, output):
         try:
             time_gap = timedelta(hours=9)
@@ -242,9 +278,9 @@ class LogManager():
         try:
             query = "select t.id, ti.input "
             query += "from stage s, task t, task_input ti "
-            query += "where s.level = max(s.level) and s.execution_id = %s and t.status < 1 "
+            query += "where s.level = (select max(level) from stage where execution_id = {}) and s.execution_id = {} and t.status < 1 ".format(str(execution_id), str(execution_id))
             query += "and s.id = t.stage_id and ti.task_id = t.id;"
-            self.cur.execute(query, str(execution_id))
+            self.cur.execute(query)
             result = self.cur.fetchall()
             return result
         except Exception as e:

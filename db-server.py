@@ -1168,9 +1168,24 @@ class ExecutionsManager(Resource):
             print (str(traceback.format_exc()))
             return { "success": False }
 
+
+    def get_latest_progress_recrawling(self, job_id):
+        try:
+            query = "select num_expected_success, num_expected_all from execution where job_id = {} and previous_id in (select max(id) from execution where job_id = {} and previous_id = 0) and previous_id != 0 order by id desc limit 1;".format(job_id, job_id)
+            cur = conn.cursor()
+            cur.execute(query)
+            result = cur.fetchone()
+            if result is None:
+                result = (0, 0)
+            return { "success": True, "result": result }
+        except:
+            conn.rollback()
+            print (str(traceback.format_exc()))
+            return { "success": False }
+
     def get_latest_progress(self, job_id):
         try:
-            query = "select num_expected_success, num_expected_all from execution where job_id = {} order by id desc limit 1;".format(job_id)
+            query = "select num_expected_success, num_expected_all from execution where job_id = {} and previous_id = 0 order by id desc limit 1;".format(job_id)
             cur = conn.cursor()
             cur.execute(query)
             result = cur.fetchone()
@@ -1226,6 +1241,8 @@ class ExecutionsManager(Resource):
             return self.get_data(args['execution_id'])
         elif args['req_type'] == 'get_latest_progress':
             return self.get_latest_progress(args['job_id'])
+        elif args['req_type'] == 'get_latest_progress_recrawling':
+            return self.get_latest_progress_recrawling(args['job_id'])
         elif args['req_type'] == 'get_latest_progress_summary':
             return self.get_latest_progress_summary(args['job_id'])
         return {}
@@ -2869,9 +2886,80 @@ class ProductListManager(Resource):
         try:
             cur = conn.cursor()
 
-            query = "select max(id) from execution where job_id = {}".format(job_id)
+            query = "select max(id) from execution where job_id = {} and previous_id = 0".format(job_id)
             cur.execute(query)
-            execution_id = cur.fetchone()[0] # [[mpid], []]
+            execution_id = cur.fetchone()[0] 
+            
+            query = "select id from execution where previous_id = {} order by id desc".format(execution_id)
+            cur.execute(query)
+            result_child_execution_ids = cur.fetchall() 
+            child_execution_ids = []
+            new_results_recrawling = []
+            new_results_recrawling_dictionry = {}
+            if len(result_child_execution_ids) != 0: 
+                child_eids = '('
+                for res in result_child_execution_ids:
+                    child_eids = child_eids + str(res[0]) + ', '
+                child_eids = child_eids[0:-2] + ')'
+                #print(child_eids)
+                query = 'select id from node where task_id in (select id from task where status > 0 and stage_id in (select id from stage where execution_id in {})) order by id desc;'.format(child_eids)
+                cur.execute(query)
+                child_node_ids_arr = cur.fetchall() 
+                if len(child_node_ids_arr) != 0:
+                    child_node_ids = '('
+                    for res in child_node_ids_arr:
+                        child_node_ids = child_node_ids + str(res[0]) + ', '
+                    child_node_ids = child_node_ids[0:-2] + ')'
+
+                    query = "select value::text, t1.id from node as t1, (select id, status from task where stage_id in (select id from stage where execution_id in {})) as t2, node_property as t3 where t1.task_id = t2.id and t3.node_id in {} and t3.node_id = t1.id and t3.key = 'name' and t2.status = 1 order by t1.id asc".format(child_eids, child_node_ids)
+                    cur.execute(query)
+                    results = cur.fetchall() 
+                    #print(results)
+                    results_dictionary = {}
+                    for res in results:
+                        node_id = res[1]
+                        results_dictionary[node_id] = {'status': 1, 'name': res[0]} 
+
+
+                    query = "select t1.status, t2.id from task as t1, node as t2 where t1.id = t2.task_id and t2.id in {}".format(child_node_ids)
+                    cur.execute(query)
+                    results0 = cur.fetchall() 
+                    #print(results0)
+                    for res in results0:
+                        node_id = res[1]
+                        if node_id in results_dictionary: 
+                            results_dictionary[node_id]['status'] = res[0]
+                        else:
+                            results_dictionary[node_id] = {'status': res[0], 'name': '"-"'}
+         
+
+                    query = "select my_product_id, t2.node_id from url_to_mpid as t1, (select distinct value::text as url, node_id from node_property where node_id in {} and key = 'url') as t2 where t1.url = t2.url order by my_product_id asc".format(child_node_ids)
+                    cur.execute(query)
+                    results1 = cur.fetchall() # [[mpid], []]
+                    #print(results1)
+                    #new_results = []
+                    # 한번이라도 성공한게 있으면 다시 안넣도록 수정( sorted by execution id) 
+                    for res in results1:
+                        mpid = res[0]
+                        if mpid not in new_results_recrawling_dictionry or new_results_recrawling_dictionry[mpid].get('status', '-1') != 1:
+                            node_id = res[1]
+                            status = results_dictionary.get(node_id, {'status': -1})['status']
+                            name = results_dictionary.get(node_id, {'name':'"-"'})['name']
+                            name = name.encode('ascii').decode('unicode_escape')
+                            if status == 1:
+                                if mpid not in new_results_recrawling_dictionry:
+                                    new_results_recrawling.append([status, name, node_id, mpid, 'recrawling'])
+                                new_results_recrawling_dictionry[mpid] = {'exist': True, 'status': 1, 'node_id': node_id}
+                            else:
+                                new_results_recrawling_dictionry[mpid] = {'exist': True, 'status': -1, 'node_id': node_id}
+                            if status == -997:
+                                name = '"-"'
+
+            #print(new_results_recrawling_dictionry)
+
+               
+                           
+
             query = "select value::text, max(node_id) from node_property where node_id in (select id from node where task_id in (select id from task where stage_id in (select max(id) from stage where execution_id = {}))) and key = 'url' group by value::text".format(execution_id)
             cur.execute(query)
             results = cur.fetchall() # [[mpid], []]
@@ -2901,19 +2989,22 @@ class ProductListManager(Resource):
                         results_dictionary[node_id] = {'status': res[0], 'name': '"-"'}
          
 
+                query = "select my_product_id, t2.node_id from url_to_mpid as t1, (select distinct value::text as url, node_id from node_property where node_id in {} and key = 'url') as t2 where t1.url = t2.url order by my_product_id asc".format(node_ids)
                 #query = "select my_product_id, t2.node_id from url_to_mpid as t1, (select distinct value::text as url, node_id from node_property where node_id in {} and key = 'url') as t2 where concat(\'\"\',t1.url,\'\"\') = t2.url order by my_product_id asc".format(node_ids)
-                query = "select my_product_id, t2.node_id from url_to_mpid as t1, (select distinct value::text as url, node_id from node_property where node_id in {} and key = 'url') as t2 where concat(\'\"\',t1.url,\'\"\') = t2.url or t1.url = t2.url order by my_product_id asc".format(node_ids)
                 cur.execute(query)
                 results1 = cur.fetchall() # [[mpid], []]
                 for res in results1:
                     mpid = res[0]
                     node_id = res[1]
-                    status = results_dictionary.get(node_id, {'status': -1})['status']
-                    name = results_dictionary.get(node_id, {'name':'"-"'})['name']
-                    name = name.encode('ascii').decode('unicode_escape')
-                    if status == -997:
-                        name = '"-"'
-                    new_results.append([status, name, node_id, mpid])
+                    if mpid not in new_results_recrawling_dictionry:
+                        status = results_dictionary.get(node_id, {'status': -1})['status']
+                        name = results_dictionary.get(node_id, {'name':'"-"'})['name']
+                        name = name.encode('ascii').decode('unicode_escape')
+                        if status == -997:
+                            name = '"-"'
+                        new_results.append([status, name, node_id, mpid, 'crawling'])
+            new_results = new_results + new_results_recrawling
+            print(new_results)
             return { "success": True, "result": new_results }
         except:
             conn.rollback()
@@ -3335,7 +3426,7 @@ class MySiteManager(Resource):
     def get_latest_progress(self, job_id):
         try:
             cur = conn.cursor()
-            query = "select num_expected_all, num_expected_success from sm_history where job_id = {} order by id desc limit 1".format(job_id)
+            query = "select num_expected_success, num_expected_all from sm_history where job_id = {} order by id desc limit 1".format(job_id)
             cur.execute(query)
             result = cur.fetchone()
             conn.commit()
