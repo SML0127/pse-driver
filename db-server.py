@@ -844,28 +844,11 @@ class ProgramsManager(Resource):
         return { "success": False }
 
 class ExecutionsManager(Resource):
-    #def get_executions(self):
-    #    try:
-    #        cur = conn.cursor()
-    #        subquery =  "select exc.id as id, exc.program_id as program_id, exc.db_schema_id as db_schema_id, exc.start_time as start_time, exc.end_time as end_time, COALESCE(stage.level, 0) as current_stage "
-    #        subquery += "from execution as exc left join stage on exc.id = stage.execution_id "
-    #        query =  "select t.id, t.program_id, t.db_schema_id, TO_CHAR(t.start_time, 'YYYY:HH24:MI:SS'), TO_CHAR(t.end_time, 'YYYY:HH24:MI:SS'), MAX(current_stage) "
-    #        query += "from (" + subquery + ") as t "
-    #        query += "group by t.id, t.program_id, t.db_schema_id, t.start_time, t.end_time "
-    #        query += "order by t.id desc; "
-    #        cur.execute(query)
-    #        result = cur.fetchall()
-    #        conn.commit()
-    #        return { "success": True, "executions" : result }
-    #    except:
-    #        conn.rollback()
-    #        print(traceback.format_exc())
-    #        return { "success": False, "traceback": str(traceback.format_exc()) }       
     def get_executions(self, job_id):
         try:
             cur = conn.cursor()
             
-            query =  "select id, program_id, null, TO_CHAR(start_time, 'YYYY-MM-DD HH24:MI:SS'), TO_CHAR(end_time, 'YYYY-MM-DD HH24:MI:SS'), null, num_success, num_fail, num_invalid, num_all from execution where job_id = {} order by id desc".format(job_id)
+            query =  "select id, program_id, null, TO_CHAR(start_time, 'YYYY-MM-DD HH24:MI:SS'), TO_CHAR(end_time, 'YYYY-MM-DD HH24:MI:SS'), null, num_success, num_fail, num_invalid, num_all, previous_id from execution where job_id = {} order by id desc".format(job_id)
             cur.execute(query)
             result = cur.fetchall()
             for idx, val in enumerate(result):
@@ -2890,7 +2873,7 @@ class ProductListManager(Resource):
             cur.execute(query)
             execution_id = cur.fetchone()[0] 
             
-            query = "select id from execution where previous_id = {} order by id desc".format(execution_id)
+            query = "select id from execution where job_id = {} and previous_id = {} order by id desc".format(job_id, execution_id)
             cur.execute(query)
             result_child_execution_ids = cur.fetchall() 
             child_execution_ids = []
@@ -2956,8 +2939,6 @@ class ProductListManager(Resource):
                                 name = '"-"'
 
             #print(new_results_recrawling_dictionry)
-
-               
                            
 
             query = "select value::text, max(node_id) from node_property where node_id in (select id from node where task_id in (select id from task where stage_id in (select max(id) from stage where execution_id = {}))) and key = 'url' group by value::text".format(execution_id)
@@ -3004,7 +2985,7 @@ class ProductListManager(Resource):
                             name = '"-"'
                         new_results.append([status, name, node_id, mpid, 'crawling'])
             new_results = new_results + new_results_recrawling
-            print(new_results)
+            #print(new_results)
             return { "success": True, "result": new_results }
         except:
             conn.rollback()
