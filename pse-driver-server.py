@@ -378,6 +378,7 @@ class DriverManager(Resource):
 
     def rerun_driver(self, wf, job_id):
         try:
+            #print("python pse_driver.py --c rerun_from_db --wf {} --job_id {}".format(wf, job_id))
             subprocess.Popen("python pse_driver.py --c rerun_from_db --wf {} --job_id {}".format(wf, job_id), shell=True)
             return {
                 "success": True,
@@ -385,6 +386,19 @@ class DriverManager(Resource):
         except:
             print (str(traceback.format_exc()))
             return { "success": False, "traceback": str(traceback.format_exc()) }       
+
+    def rerun_driver_node_ids(self, wf, job_id, node_ids = ''):
+        try:
+            #print("python pse_driver.py --c rerun_node_ids_from_db --wf {} --job_id {} --node_ids {}".format(wf, job_id, node_ids))
+            subprocess.Popen("python pse_driver.py --c rerun_node_ids_from_db --wf {} --job_id {} --node_ids {}".format(wf, job_id, node_ids), shell=True)
+            return {
+                "success": True,
+            }
+        except:
+            print (str(traceback.format_exc()))
+            return { "success": False, "traceback": str(traceback.format_exc()) }       
+
+
 
 
 
@@ -422,15 +436,18 @@ class DriverManager(Resource):
         parser.add_argument('path', required=False)
         parser.add_argument('mpids', required=False)
         parser.add_argument('target_ids', required=False)
-
+        parser.add_argument('node_ids', required=False)
         args = parser.parse_args()
         print_flushed(args)
+        
         if args['req_type'] == "register_program_execution":
             return self.register_program_execution(args['program'], args['category'])
         elif args['req_type'] == "run_driver":
             return self.run_driver(args['wf'], args['job_id'])
         elif args['req_type'] == "rerun_driver":
             return self.rerun_driver(args['wf'], args['job_id'])
+        elif args['req_type'] == "rerun_driver_node_ids":
+            return self.rerun_driver_node_ids(args['wf'], args['job_id'], args['node_ids'])
         elif args['req_type'] == "run_transformation_to_mysite":
             return self.run_transformation_to_mysite(args['job_id'])
         elif args['req_type'] == "update_mysite":

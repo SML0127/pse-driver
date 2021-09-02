@@ -287,6 +287,22 @@ class LogManager():
             self.conn.rollback()
             raise LogMgrErr(e)
 
+    def get_failed_tasks_of_node_ids(self, node_ids):
+        try:
+            node_ids_string = '(' 
+            for val in node_ids:
+                node_ids_string = node_ids_string + val + ', '
+            node_ids_string = node_ids_string[0:-2] + ')'
+            query = "select task_id, input from task_input where task_id in (select task_id from node where id in {})".format(node_ids_string)
+            #print(query)
+            self.cur.execute(query)
+            result = self.cur.fetchall()
+            return result
+        except Exception as e:
+            self.conn.rollback()
+            raise LogMgrErr(e)
+
+
     def get_failed_tasks_of_levelOLD(self, execution_id, level):
         try:
             query = "select t.id, ti.input "

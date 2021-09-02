@@ -134,6 +134,27 @@ class PseDriver():
             print_flushed("---------------------------------------")
             raise e
 
+
+    def rerun_node_ids(self, program, previous_eid, eid, job_id, node_ids):
+        try:
+            self.init_program(program)
+            program['lm'] = self.log_manager
+            program['execution_id'] = eid
+            program['job_id'] = job_id
+            dag_scheduler = DagScheduler()
+            dag_scheduler.rerun_node_ids(program, previous_eid, node_ids)
+        except Exception as e:
+            print_flushed("-------Raised Exception in DRIVER-------")
+            print_flushed(e)
+            print_flushed("---------------------------------------")
+            print_flushed("--------------STACK TRACE--------------")
+            print_flushed(str(traceback.format_exc()))
+            print_flushed("---------------------------------------")
+            raise e
+
+
+
+
     def register_execution(self, prog_name, program, category):
         program_id = self.log_manager.save_program(prog_name, program)
 
@@ -178,6 +199,26 @@ class PseDriver():
             eid = self.log_manager.start_execution(args.wf, previous_eid, job_id)
         try:
             self.rerun(program, previous_eid, eid, job_id)
+        except Exception as e:
+            self.log_manager.end_execution(
+                eid, {"status": -1, "error": str(traceback.format_exc())})
+            raise e
+        self.log_manager.end_execution(eid, {"status": 1})
+        return eid
+
+
+    def rerun_node_ids_from_db(self, args):
+        #print(args.node_ids)
+        #print(type(args.node_ids))
+        program = self.load_program_from_db(args.wf)
+        job_id = -1
+        previous_eid = -1
+        if args.job_id is not None:
+            job_id = args.job_id
+            previous_eid, c_date = self.log_manager.get_lastest_no_rerun_execution_id_using_job_id(job_id)
+            eid = self.log_manager.start_execution(args.wf, previous_eid, job_id)
+        try:
+            self.rerun_node_ids(program, previous_eid, eid, job_id, args.node_ids)
         except Exception as e:
             self.log_manager.end_execution(
                 eid, {"status": -1, "error": str(traceback.format_exc())})
@@ -663,12 +704,15 @@ class PseDriver():
             parser.add_argument('--max_page', required=False)
             parser.add_argument('--job_id', required=False)
             parser.add_argument('--groupbykey', nargs='+', required=False)
+            parser.add_argument('--node_ids', nargs='+', required=False)
             args, unknown = parser.parse_known_args()
             print_flushed(args)
             if args.c == 'run_execution':
                 return self.run_execution(args)
             elif args.c == 'rerun_from_db':
                 return self.rerun_from_db(args)
+            elif args.c == 'rerun_node_ids_from_db':
+                return self.rerun_node_ids_from_db(args)
             #elif args.c == 'rerun_execution_from_db':
             #    return self.rerun_execution_from_db(args)
             #elif args.c == 'rerun_execution_from_file':
