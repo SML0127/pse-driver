@@ -87,7 +87,7 @@ class LogManager():
 
     def get_lastest_execution_id_using_job_id(self, job_id):
         try:
-            query = "select id, start_time from execution where job_id = {} order by id desc limit 1;".format(job_id)
+            query = "select id, start_time, previous_id from execution where job_id = {} order by id desc limit 1;".format(job_id)
             self.cur.execute(query)
             result = self.cur.fetchone()
             self.conn.commit()

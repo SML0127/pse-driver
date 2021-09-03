@@ -374,7 +374,6 @@ class GraphManager():
 
         except:
            self.gp_conn.rollback()
-           print_flushed('?????????????????')
            print_flushed(str(traceback.format_exc()))
            raise       
         return True
@@ -1153,6 +1152,8 @@ class GraphManager():
                     result[row[0]] = row[1]
             purl = result['url']
 
+            if purl[0] != '"':
+                purl = '"' + purl + '"'
             query_mpid = "select my_product_id from url_to_mpid where url like '{}'".format(
                 purl)
             self.gp_cur.execute(query_mpid)
