@@ -8,10 +8,17 @@ What we provide
 1. Crawl and Parse product data in distributed environment (Master / Worker).
 2. Update product information in the database incrementaly.
    (Update example)
-   ![example_of_update_in_db_new](https://user-images.githubusercontent.com/13589283/140600366-d5875ca3-2022-438b-8a9b-0e4746efa052.png)
+   ![update_db](https://user-images.githubusercontent.com/13589283/140600455-fc2c143e-9d12-4c8c-984f-e1d9b082c9fb.jpg)
+
 
 3. Upload crawled data to target sites.
 4. Register schedule for crawling and view maintenance ({upload, update} to {database, target sites}).
 
-How to Support
+How to Impelement & Support
+
+0. Provide all services through GUI (based on React).
+1. For BFS Crawling Model, we provide several operators (based on Python).
+2. For supporting distributed environment, we used Redis & RQ as a Message Broker.
+3. 
+
 
