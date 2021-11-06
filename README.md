@@ -1,7 +1,7 @@
 # Master of Distributed Web Crawler and Data Management System for Web Data 
 
-## What we provide in Master
 
+## What we provide
 1. Crawl and Parse product data in distributed environment (Master / Worker).
 2. Update product information in the database incrementaly.
 
@@ -14,7 +14,6 @@
 
 ------------
 ## How to Impelement & Support
-
 0. Provide all services through GUI (based on React).
 1. For BFS Crawling Model, we provide several operators (based on Python).
 2. For supporting distributed environment, we used Redis & RQ as a Message Broker.
@@ -22,11 +21,10 @@
 
 ------------
 ## What languages, libraries, and tools were used?
-
 - Mainly based on Python
 - Python Flask for Web Application Server and DB Server
 - PostgreSQL for Database
-- Apachi Airflow for Scheduling
-- Redis & RQ for Message Broker in distributed environment
-- 
+- [Apachi Airflow](https://airflow.apache.org/) for Scheduling
+- [Redis](https://redis.io/) & [RQ](https://python-rq.org/) for Message Broker in distributed environment
+- [Docker](https://www.docker.com/) for enviornment (git repository link: https://github.com/SML0127/pse-master-Dockerfile)
 
