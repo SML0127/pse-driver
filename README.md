@@ -6,7 +6,8 @@
 2. Update product information in the database incrementaly.
 <br>
    (Update example)
-   ![update_db](https://user-images.githubusercontent.com/13589283/140600455-fc2c143e-9d12-4c8c-984f-e1d9b082c9fb.jpg)
+   <br>
+<img width="300" height="400" alt="overall_architecture" src="https://user-images.githubusercontent.com/13589283/140600455-fc2c143e-9d12-4c8c-984f-e1d9b082c9fb.jpg">
 
 
 3. Upload crawled data to target sites.
