@@ -2,21 +2,24 @@
 
 
 ## What we provide
-1. Crawl and Parse product data in distributed environment (Master / Worker).
-2. Update product information in the database incrementaly.
+- Crawl and Parse product data in distributed environment (Master / Worker).
+- Update product information in the database incrementaly.
 
    (Update example)
 <img width="400" height="500" alt="overall_architecture" src="https://user-images.githubusercontent.com/13589283/140600455-fc2c143e-9d12-4c8c-984f-e1d9b082c9fb.jpg">
 
-3. Upload crawled data to target sites.
-4. Register schedule for crawling and view maintenance ({upload, update} to {database, target sites}).
+- Upload crawled data to target sites.
+- Register schedule for crawling and view maintenance ({upload, update} to {database, target sites}).
 
 ------------
 ## How to Impelement & Support
-0. Provide all services through GUI (based on React).
-1. For BFS Crawling Model, we provide several operators (based on Python).
-2. For supporting distributed environment, we used Redis & RQ as a Message Broker.
-3. [Docker](https://www.docker.com/) image for enviornment of Master (git repository link: https://github.com/SML0127/pse-master-Dockerfile)
+- Provide all services through GUI (based on React).
+   - git repository link for Master: https://github.com/SML0127/pse-master-Dockerfile)
+- For BFS Crawling Model, we provide several operators (based on Python).
+- For supporting distributed environment, we used Redis & RQ as a Message Broker.
+- [Docker](https://www.docker.com/) image for enviornment
+   - git repository link for Master: https://github.com/SML0127/pse-master-Dockerfile)
+   - git repository link for Worker: https://github.com/SML0127/pse-worker-Dockerfile)
 
 
 ------------
