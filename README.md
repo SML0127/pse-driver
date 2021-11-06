@@ -5,10 +5,6 @@
 - Create workflows for crawling.
 - Crawl and Parse product data in distributed environment (Master / Worker model).
 - Upload / Update crawled data in the database incrementaly (View maintenance in Database).
-
-   (Update example)
-<img width="400" height="500" alt="overall_architecture" src="https://user-images.githubusercontent.com/13589283/140600455-fc2c143e-9d12-4c8c-984f-e1d9b082c9fb.jpg">
-
 - Upload / Update crawled data to target sites (View maintenance in target sites).
 - Register schedule for crawling and view maintenance.
 
