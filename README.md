@@ -1,9 +1,6 @@
 # Master of Distributed Web Crawler and Data Management System for Web Data 
-Master for crawling and performing view maintenance the product data of e-commerce sites.
 
-<br>
-
-What we provide in Master
+##What we provide in Master
 
 1. Crawl and Parse product data in distributed environment (Master / Worker).
 2. Update product information in the database incrementaly.
@@ -15,8 +12,7 @@ What we provide in Master
 4. Register schedule for crawling and view maintenance ({upload, update} to {database, target sites}).
 
 ------------
-<br>
-How to Impelement & Support
+##How to Impelement & Support
 
 0. Provide all services through GUI (based on React).
 1. For BFS Crawling Model, we provide several operators (based on Python).
@@ -24,9 +20,7 @@ How to Impelement & Support
 3. 
 
 ------------
-<br>
-
-What languages, libraries, and tools were used?
+##What languages, libraries, and tools were used?
 
 - Mainly based on Python
 - Python Flask for Web Application Server and DB Server
