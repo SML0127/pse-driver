@@ -13,13 +13,13 @@
 
 ------------
 ## How to Impelement & Support
-- Provide all services through GUI (based on React).
-   - git repository link for Master: https://github.com/SML0127/pse-master-Dockerfile)
-- For BFS Crawling Model, we provide several operators (based on Python).
+- Provide all services through GUI.
+   - git repository link: https://github.com/SML0127/pse-extension
+- For BFS Crawling Model, we provide several operators.
 - For supporting distributed environment, we used Redis & RQ as a Message Broker.
 - [Docker](https://www.docker.com/) image for enviornment
-   - git repository link for Master: https://github.com/SML0127/pse-master-Dockerfile)
-   - git repository link for Worker: https://github.com/SML0127/pse-worker-Dockerfile)
+   - git repository link for Master: https://github.com/SML0127/pse-master-Dockerfile
+   - git repository link for Worker: https://github.com/SML0127/pse-worker-Dockerfile
 
 
 ------------
