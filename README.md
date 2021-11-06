@@ -1,10 +1,9 @@
-# PSE-driver
-Engine(master) code to crawl and perform view maintenance the product data of e-commerce sites.
+# Master of Distributed Web Crawler and Data Management System for Web Data 
+Master for crawling and performing view maintenance the product data of e-commerce sites.
 
 
-What we provide
+What we provide in Master
 
-0. Create and manage workflows for crawling.
 1. Crawl and Parse product data in distributed environment (Master / Worker).
 2. Update product information in the database incrementaly.
    (Update example)
@@ -21,4 +20,13 @@ How to Impelement & Support
 2. For supporting distributed environment, we used Redis & RQ as a Message Broker.
 3. 
 
+
+What languages, libraries, and tools were used?
+
+- Mainly based on Python
+- Python Flask for Web Application Server and DB Server
+- PostgreSQL for Database
+- Apachi Airflow for Scheduling
+- Redis & RQ for Message Broker in distributed environment
+- 
 
