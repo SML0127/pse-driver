@@ -2,22 +2,22 @@
 
 
 ## What we provide
-- Crawl and Parse product data in distributed environment (Master / Worker).
-- Update product information in the database incrementaly.
+- Crawl and Parse product data in distributed environment (Master / Worker model).
+- Upload / Update product information in the database incrementaly (View maintenance for Database).
 
    (Update example)
 <img width="400" height="500" alt="overall_architecture" src="https://user-images.githubusercontent.com/13589283/140600455-fc2c143e-9d12-4c8c-984f-e1d9b082c9fb.jpg">
 
-- Upload crawled data to target sites.
-- Register schedule for crawling and view maintenance ({upload, update} to {database, target sites}).
+- Upload / Update crawled data to target sites (View maintenance for target sites).
+- Register schedule for crawling and view maintenance.
 
 ------------
-## How to Impelement & Support
+## How to support
 - Provide all services through GUI.
    - git repository link: https://github.com/SML0127/pse-extension
-- For BFS Crawling Model, we provide several operators.
-- For supporting distributed environment, we used Redis & RQ as a Message Broker.
-- [Docker](https://www.docker.com/) image for enviornment
+- For crawling in distributed environment, we used Breadth-First-Search Crawling Model and Redis & RQ as a Message Broker.
+- For Breadth-First-Search Crawling Model, we create several operators for crawling.
+- [Docker](https://www.docker.com/) image for our ubuntu environment
    - git repository link for Master: https://github.com/SML0127/pse-master-Dockerfile
    - git repository link for Worker: https://github.com/SML0127/pse-worker-Dockerfile
 
