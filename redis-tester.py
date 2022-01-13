@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
   #gvar = GlovalVariable()
   #gvar.graph_mgr = GraphManager()
-  #gvar.graph_mgr.connect("host=141.223.197.35 port=54320 user=pse password=pse dbname=pse")
+  #gvar.graph_mgr.connect("host=141.223.XXXX.XX port=XXXX user=pse password=pse dbname=pse")
   #gvar.graph_mgr.delete_stock_zero_in_mysite()
   #redis_manager = RedisManager()
   #settings = {'redis_host': '127.0.0.1' , 'redis_port': '6379', 'redis_queue': 'real_queue' }
@@ -50,7 +50,7 @@ if __name__ == '__main__':
   #try:
   #   #print(gvar.graph_mgr.get_shipping_fee('A Company'))
   #   #workers = Worker.all(connection=redis_manager.get_connection)
-  #   #subprocess.Popen("ssh -p 20220 pse@141.223.197.34 'cd /home/pse/PSE-engine; /home/pse/.pyenv/shims/rq worker  --url redis://141.223.197.33:63790 -n worker_34_1 -w engine.pse_worker.pseWorker --job-class engine.pse_job.pseJob real_queue'" , shell=True)
+  #   #subprocess.Popen("ssh -p 20220 pse@141.223.XXX.XX 'cd /home/pse/PSE-engine; /home/pse/.pyenv/shims/rq worker  --url redis://141.223.XXX.XX:XXXX -n worker_34_1 -w engine.pse_worker.pseWorker --job-class engine.pse_job.pseJob real_queue'" , shell=True)
   #   workers = Worker.all(queue=rq)
   #   for worker in workers:
   #      print(worker)
@@ -58,8 +58,7 @@ if __name__ == '__main__':
   #      print(worker.state)
   #      print(worker.pid)
   #      print(worker.ip)
-  #      #print("ssh -p 20220 pse@141.223.197.34 'kill -8 {}'".format(worker.pid))
-  #      #subprocess.Popen("ssh -p 20220 pse@141.223.197.34 'kill -8 {}'".format(worker.pid) , shell=True)
+
   #      print('killllllllllll')
 
   #except Exception as e:
