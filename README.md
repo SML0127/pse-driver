@@ -11,6 +11,9 @@
 ![Selenium](https://img.shields.io/badge/Selenium-43B02A?style=for-the-badge&logo=Selenium&logoColor=white)
 ![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
 
+<br>
+
+------------
 ## What we provide
 - Create workflows for crawling.
 - Crawl and Parse product data in distributed environment (Master / Worker model).
