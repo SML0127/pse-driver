@@ -286,8 +286,8 @@ class DriverManager(Resource):
             
             worker_name = 'Worker-' + str(worker_id)
             
-            print_flushed("ssh -p {} pse@{} 'cd /home/pse/PSE-engine; /home/pse/.pyenv/shims/rq worker  --url redis://141.223.197.35:63790 -n {} -w engine.pse_worker.pseWorker --job-class engine.pse_job.pseJob real_queue'".format(worker_port, worker_ip, worker_name))
-            subprocess.Popen("ssh -p {} pse@{} 'cd /home/pse/PSE-engine; /home/pse/.pyenv/shims/rq worker  --url redis://141.223.197.35:63790 -n {} -w engine.pse_worker.pseWorker --job-class engine.pse_job.pseJob real_queue'".format(worker_port, worker_ip, worker_name) , shell=True)
+            print_flushed("ssh -p {} pse@{} 'cd /home/pse/PSE-engine; /home/pse/.pyenv/shims/rq worker  --url  -n {} -w engine.pse_worker.pseWorker --job-class engine.pse_job.pseJob real_queue'".format(worker_port, worker_ip, worker_name))
+            subprocess.Popen("ssh -p {} pse@{} 'cd /home/pse/PSE-engine; /home/pse/.pyenv/shims/rq worker  --url  -n {} -w engine.pse_worker.pseWorker --job-class engine.pse_job.pseJob real_queue'".format(worker_port, worker_ip, worker_name) , shell=True)
             
             return { "success": True }       
         except:
