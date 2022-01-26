@@ -35,7 +35,7 @@ if __name__ == '__main__':
     gvar = GlovalVariable()
     gvar.graph_mgr = GraphManager()
     gvar.graph_mgr.connect(
-        "host=141.223.197.42 port=54320 user=pse password=pse dbname=pse")
+        "host= port= user=pse password=pse dbname=pse")
     try:
         #tmp = gvar.graph_mgr.get_node_properties_from_mysite_for_update(317, 679)
         tmp = gvar.graph_mgr.get_ransformation_program(50)
